@@ -28,7 +28,6 @@ if __name__ == "__main__":
     # evaluation
     print(mean_squared_error(eval_ypred,evalY))
 
-
     # refit whole training set
     model = Model('svr')
     model.fit(X, Y)
