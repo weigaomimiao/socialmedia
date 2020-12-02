@@ -300,7 +300,7 @@ class BuildDataset():
         testX= df_test.values
         self.standar.fit(trainX)
         self.trainX= self.standar.transform(trainX)
-        self.trainY = trainY
+        self.trainY = np.expand_dims(trainY,axis=1)
         self.testX = self.standar.transform(testX)
         self.testId = testId
 

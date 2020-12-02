@@ -32,6 +32,7 @@ if __name__ == "__main__":
         # print("TRAIN:", train_index, "TEST:", val_index)
         X_train, X_val = X[train_index,:], X[val_index,:]
         y_train, y_val = Y[train_index], Y[val_index]
+
         model.fit(X_train,y_train)
         # predict
         val_ypred = model.predict(X_val)
@@ -47,7 +48,8 @@ if __name__ == "__main__":
     # refit whole training set
     # model = Model('mlp')
     # model.fit(X, Y)
-    ypred = model.predict(testX)
+    model_fit = model.loadModel()
+    ypred = model_fit.predict(testX)
     # ypred = stander.inverse_standarde_y(ypred)
 
     # save prediction to csv

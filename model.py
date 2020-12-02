@@ -12,6 +12,7 @@ from sklearn.svm import SVR
 from keras import models
 from keras import layers
 from util import getBasePath
+import keras
 class Model():
     def __init__(self,xshape,modeltype='mlp',savemodel=True):
         self.model = self.initmodel(modeltype,xshape,savemodel)
@@ -31,6 +32,9 @@ class Model():
 
     def savemodel(self):
         self.model.savemodel()
+
+    def loadModel(self):
+        return self.model.loadModel()
 
 
 class MLP():
@@ -54,7 +58,7 @@ class MLP():
         return model
 
     def fit(self,X,y):
-        self.model.fit(X, y,epochs=250, batch_size=4, verbose=1)
+        self.model.fit(X, y,epochs=1, batch_size=20, verbose=1)
         # if self.isModelSave:
         #     self.savemodel()
 
@@ -63,3 +67,6 @@ class MLP():
 
     def savemodel(self):
         self.model.save('%s/model/model.h5'%getBasePath())
+
+    def loadModel(self):
+        return keras.models.load_model('%s/model/model.h5'%getBasePath())
