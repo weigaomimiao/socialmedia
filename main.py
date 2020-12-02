@@ -10,29 +10,45 @@
 '''
 from clean import BuildDataset
 from model import Model
-from sklearn.metrics import mean_squared_error
+from sklearn.metrics import mean_squared_log_error
 from sklearn.model_selection import train_test_split
+from sklearn.model_selection import KFold
 from util import saveResult
 
 if __name__ == "__main__":
     # training set and test set building
-    X,Y,testX,testY,testId,stander = BuildDataset()
-    trainX,trainY,evalX,evalY = train_test_split(X,Y,test_size=0.3,random_state=420)
+    builder = BuildDataset()
+    X, Y, testX, testId, stander = builder.getData()
+    # trainX,trainY,evalX,evalY = train_test_split(X,Y,test_size=0.3,random_state=420)
 
     # fit model with part data and evaluation
-    model = Model('svr')
-    model.fit(trainX,trainY)
-    # predict
-    eval_ypred = model.predict(evalX)
-    eval_ypred = stander.inverse_standarde_y(eval_ypred)
-    # evaluation
-    print(mean_squared_error(eval_ypred,evalY))
+    xshape = X.shape[1]
+    model = Model(modeltype='mlp',xshape=xshape,savemodel=True)
+    kf = KFold(n_splits=15,random_state=None, shuffle=False)
+    kf.get_n_splits(X)
+    errlist = []
+    errtmp = 999999.
+    for train_index, val_index in kf.split(X):
+        # print("TRAIN:", train_index, "TEST:", val_index)
+        X_train, X_val = X[train_index,:], X[val_index,:]
+        y_train, y_val = Y[train_index], Y[val_index]
+        model.fit(X_train,y_train)
+        # predict
+        val_ypred = model.predict(X_val)
+        # val_ypred = stander.inverse_standarde_y(eval_ypred)
+        # evaluation
+        tmp = mean_squared_log_error(val_ypred,y_val)
+        if(tmp<errtmp):
+            errtmp = tmp
+            model.savemodel()
+        print(tmp)
+        errlist.append(tmp)
 
     # refit whole training set
-    model = Model('svr')
-    model.fit(X, Y)
+    # model = Model('mlp')
+    # model.fit(X, Y)
     ypred = model.predict(testX)
-    ypred = stander.inverse_standarde_y(ypred)
+    # ypred = stander.inverse_standarde_y(ypred)
 
     # save prediction to csv
     saveResult(testId,ypred)

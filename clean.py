@@ -29,7 +29,7 @@ class Loader():
         self.indexlist_ = ['id','uname','url','covImgStatus','verifStatus','textColor','pageColor','themeColor','isViewSizeCustom','utcOffset','location','isLocVisible','uLanguage','creatTimestamp','uTimeZone','numFollowers','numPeopleFollowing','numStatUpdate','numDMessage','category','avgvisitPerSecond','avgClick','profileImg','numPLikes']
         self.stander = StandardScaler() # for standardization if needed
         if pickfields is None:
-            self.pickFields_ = ['avgvisitPerSecond']
+            self.pickFields_ = ['numPeopleFollowing','hasUrl','avgClick','category','verifStatus','numFollowers','textClass','pageClass','themeClass','numDMessage','isLocVisible','uLanguage', 'creatTimestamp_year','isViewSizeCustom','numPLikes']
         else:
             self.pickFields_ = pickfields
 
@@ -41,7 +41,10 @@ class Loader():
             return ""
         filename = astr % (basepath, dataset)
         self.df = pd.read_csv(filename)
-        self.df.columns = self.indexlist_
+        if dataset == 'test':
+            self.df.columns = self.indexlist_[:-1]
+        else:
+            self.df.columns = self.indexlist_
 
         self.fillna()
         self.recodeData()
@@ -49,7 +52,7 @@ class Loader():
         if(dataset=='train'):
             return self.df[self.pickFields_]
         else:
-            return self.df[self.pickFields_[:-2]],self.df['id']
+            return self.df[self.pickFields_[:-1]],self.df['id']
 
     def recodeData(self):
         # field Personal URL: 1 for not null, 0 for null
@@ -59,18 +62,14 @@ class Loader():
         le.fit(self.df['hasUrl'].unique())
         self.df['hasUrl'] = le.transform(self.df['hasUrl'])
 
+        # create_timpstamp_year
+        self.df["creatTimestamp_year"] = self.df['creatTimestamp'].apply(lambda x: x.split()[-1]).tolist()
+        self.df["creatTimestamp_year"] = self.df['creatTimestamp_year'].apply(lambda x: int(x))
         # encode covImgStatus
         le.fit(self.df['covImgStatus'].unique())
         distr = le.classes_
         di = {distr[0]: 0, distr[1]: 1, distr[2]: 2}
         self.df.replace({"covImgStatus": di})
-
-        self.extractImg()
-        self.extractLoc()
-
-        # encode hasurl
-        le.fit(self.df['hasUrl'].unique())
-        self.df['hasUrl'] = le.transform(self.df['hasUrl'])
 
         # encode islocVisible
         le.fit(self.df['isLocVisible'].unique())
@@ -88,21 +87,36 @@ class Loader():
         self.df['isViewSizeCustom'] = le.transform(self.df['isViewSizeCustom'])
 
         '''frequency encode'''
-        # encode uLanguage, creatTimestamp_year, utcOffset
-        encoder = ce.CountFrequencyCategoricalEncoder(encoding_method='frequency',
-                                                      variables=['uLanguage', 'creatTimestamp_year', 'utcOffset'])
-        # fit the encoder
-        encoder.fit(self.df)
-        # transform the data
-        self.df = encoder.transform(self.df)
+        # # encode uLanguage, creatTimestamp_year, utcOffset
+        # encoder = ce.CountFrequencyCategoricalEncoder(encoding_method='frequency',
+        #                                               variables=['uLanguage'])
+        # # fit the encoder
+        # encoder.fit(self.df)
+        # # transform data
+        # self.df['uLanguagefreq'] = encoder.transform(self.df)
+
+        le = LabelEncoder()
+        le.fit(self.df['uLanguage'].unique())
+        self.df['uLanguage'] = le.transform(self.df['uLanguage'])
+
+        le = LabelEncoder()
+        le.fit(self.df['category'].unique())
+        self.df['category'] = le.transform(self.df['category'])
+
+        self.extractImg()
+        self.extractLoc()
+
 
     def extractLoc(self):
         # extract features from field "location"
-        self.df['newName'] = "blabla"
+        pass
 
     def extractImg(self):
         # extract features from profile image
-        self.df['newNameImg'] = "blabla"
+        # y = self.df['numPLike']
+
+        # self.df['newNameImg'] = "blabla"
+        pass
 
     def classifyColor(self):
         '''
@@ -150,7 +164,7 @@ class Loader():
         data_set['url'] = data_set['url'].isnull()
         data_set['url'] = data_set['url'].replace([True, False], [False, True])
 
-        data_set['temp'] = range(0, 7500) # avoid bug when select train_set
+        data_set['temp'] = range(0, self.df.shape[0]) # avoid bug when select train_set
 
         # seprate train_set,test_set
         test_set = data_set[data_set['category'] == ' ']
@@ -255,8 +269,6 @@ class Loader():
         self.classifyColor()
 
 
-
-
     def fillLoc(self):
         # filling?
         pass
@@ -264,32 +276,40 @@ class Loader():
 class Standardize():
     def __init__(self):
         self.standrdX = StandardScaler()
-        self.standrdY = StandardScaler()
 
-    def fit(self,X,Y):
+    def fit(self,X):
         self.standrdX.fit(X)
-        self.standrdX.fit(Y)
 
-    def transform(self,X,Y=None):
-        if Y is None:
-            return self.standrdX.transform(X,copy=True)
-        else:
-            return self.standrdX.transform(X,copy=True),self.standrdY.transform(Y,copy=True)
+    def transform(self,X):
+        # if Y is None:
+        #     return self.standrdX.transform(X,copy=True)
+        # else:
+        return self.standrdX.transform(X,copy=True)
 
-    def inverse_standarde_y(self,Y):
-        return self.standrdY.inverse_transform(Y)
+    # def inverse_standarde_y(self,Y):
+    #     return self.standrdY.inverse_transform(Y)
 
 class BuildDataset():
     def __init__(self,pickfields=None):
         self.standar = Standardize()
-        loader = Loader(pickfields)
-        df_train = loader.loadData('train')
-        df_test,testId = loader.loadData('test')
-        trainX, trainY = df_train.iloc[:, :-2].values, df_train.iloc[:, -1].values
+        loader_train = Loader(pickfields)
+        loader_test = Loader(pickfields)
+        df_train = loader_train.loadData('train')
+        df_test,testId = loader_test.loadData('test')
+        trainX, trainY = df_train.iloc[:, :-1].values, df_train['numPLikes'].values
         testX= df_test.values
-        self.stander.fit(trainX, trainY)
-        self.trainX,self.trainY= self.stander.transform(trainX, trainY)
-        self.testX = self.stander.transform(testX)
+        self.standar.fit(trainX)
+        self.trainX= self.standar.transform(trainX)
+        self.trainY = trainY
+        self.testX = self.standar.transform(testX)
         self.testId = testId
 
-        return self.trainX,self.trainY,self.testX,testId,self.standar
+    def getData(self):
+        return self.trainX,self.trainY,self.testX,self.testId,self.standar
+
+class ProfileCNN():
+    def __init__(self):
+        pass
+
+    def buildNet(self,xshape):
+        pass
