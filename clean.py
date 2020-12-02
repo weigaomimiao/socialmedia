@@ -276,18 +276,20 @@ class Loader():
 class Standardize():
     def __init__(self):
         self.standrdX = StandardScaler()
+        self.standrdY = StandardScaler()
 
-    def fit(self,X):
+    def fit(self,X,Y):
         self.standrdX.fit(X)
+        self.standrdY.fit(Y)
 
-    def transform(self,X):
-        # if Y is None:
-        #     return self.standrdX.transform(X,copy=True)
-        # else:
-        return self.standrdX.transform(X,copy=True)
+    def transform(self,X,Y=None):
+        if Y is None:
+            return self.standrdX.transform(X,copy=True)
+        else:
+            return self.standrdX.transform(X,copy=True),self.standrdY.transform(Y,copy=True)
 
-    # def inverse_standarde_y(self,Y):
-    #     return self.standrdY.inverse_transform(Y)
+    def inverse_standarde_y(self,Y):
+        return self.standrdY.inverse_transform(Y)
 
 class BuildDataset():
     def __init__(self,pickfields=None):
@@ -298,14 +300,15 @@ class BuildDataset():
         df_test,testId = loader_test.loadData('test')
         trainX, trainY = df_train.iloc[:, :-1].values, df_train['numPLikes'].values
         testX= df_test.values
-        self.standar.fit(trainX)
-        self.trainX= self.standar.transform(trainX)
-        self.trainY = np.expand_dims(trainY,axis=1)
+        trainY = np.expand_dims(trainY, axis=1)
+        self.Ynorm = trainY
+        self.standar.fit(trainX,trainY)
+        self.trainX,self.trainY= self.standar.transform(trainX,trainY)
         self.testX = self.standar.transform(testX)
         self.testId = testId
 
     def getData(self):
-        return self.trainX,self.trainY,self.testX,self.testId,self.standar
+        return self.trainX,self.trainY,self.Ynorm,self.testX,self.testId,self.standar
 
 class ProfileCNN():
     def __init__(self):

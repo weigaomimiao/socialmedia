@@ -18,7 +18,8 @@ from util import saveResult
 if __name__ == "__main__":
     # training set and test set building
     builder = BuildDataset()
-    X, Y, testX, testId, stander = builder.getData()
+    X, Y,Ynorm,testX, testId, stander = builder.getData()
+    # Ynorm is y after normalized, Y is the real integer data
     # trainX,trainY,evalX,evalY = train_test_split(X,Y,test_size=0.3,random_state=420)
 
     # fit model with part data and evaluation
@@ -31,13 +32,15 @@ if __name__ == "__main__":
     for train_index, val_index in kf.split(X):
         # print("TRAIN:", train_index, "TEST:", val_index)
         X_train, X_val = X[train_index,:], X[val_index,:]
-        y_train, y_val = Y[train_index], Y[val_index]
+        y_train, y_val = Y[train_index], Ynorm[val_index]
 
         model.fit(X_train,y_train)
         # predict
         val_ypred = model.predict(X_val)
-        # val_ypred = stander.inverse_standarde_y(eval_ypred)
+        val_ypred = stander.inverse_standarde_y(val_ypred)
         # evaluation
+        print((val_ypred<0).sum())
+        print((y_val < 0).sum())
         tmp = mean_squared_log_error(val_ypred,y_val)
         if(tmp<errtmp):
             errtmp = tmp
@@ -50,7 +53,7 @@ if __name__ == "__main__":
     # model.fit(X, Y)
     model_fit = model.loadModel()
     ypred = model_fit.predict(testX)
-    # ypred = stander.inverse_standarde_y(ypred)
+    ypred = stander.inverse_standarde_y(ypred)
 
     # save prediction to csv
     saveResult(testId,ypred)

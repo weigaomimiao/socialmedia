@@ -12,6 +12,7 @@ from sklearn.svm import SVR
 from keras import models
 from keras import layers
 from util import getBasePath
+import numpy as np
 import keras
 class Model():
     def __init__(self,xshape,modeltype='mlp',savemodel=True):
@@ -44,26 +45,27 @@ class MLP():
 
     def buildModel(self,xshape):
         model = models.Sequential()
-        model.add(layers.Dense(64, activation='relu', input_shape=(xshape,)))
+        model.add(layers.Dense(32, activation='relu', input_shape=(xshape,)))
+        model.add(layers.Dense(32, activation='relu'))
         model.add(layers.Dense(64, activation='relu'))
-        model.add(layers.Dense(128, activation='relu'))
-        model.add(layers.Dense(64, activation='relu'))
-        model.add(layers.Dense(64, activation='relu'))
+        model.add(layers.Dense(32, activation='relu'))
+        model.add(layers.Dense(32, activation='relu'))
         model.add(layers.Dense(1))
         ##opt = keras.optimizers.Adam(learning_rate=0.01)
         # optimizer='rmsprop'
-
-        model.compile(optimizer='rmsprop', loss='mse', metrics=['mae'])
+        opt = keras.optimizers.rmsprop(learning_rate=0.001)
+        model.compile(optimizer=opt, loss='mse', metrics=['mae'])
 
         return model
 
     def fit(self,X,y):
-        self.model.fit(X, y,epochs=1, batch_size=20, verbose=1)
+        self.model.fit(X, y,epochs=100, batch_size=20, verbose=0)
         # if self.isModelSave:
         #     self.savemodel()
 
     def predict(self,X):
-        return self.model.predict(X)
+        ypred = self.model.predict(X)
+        return np.ceil(ypred)
 
     def savemodel(self):
         self.model.save('%s/model/model.h5'%getBasePath())
