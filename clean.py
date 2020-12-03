@@ -64,7 +64,7 @@ class Loader():
 
         # create_timpstamp_year
         self.df["creatTimestamp_year"] = self.df['creatTimestamp'].apply(lambda x: x.split()[-1]).tolist()
-        self.df["creatTimestamp_year"] = self.df['creatTimestamp_year'].apply(lambda x: int(x))
+
         # encode covImgStatus
         le.fit(self.df['covImgStatus'].unique())
         distr = le.classes_
@@ -73,7 +73,6 @@ class Loader():
 
         # encode islocVisible
         le.fit(self.df['isLocVisible'].unique())
-        self.isLocVisible_lowercase()
         self.df['isLocVisible'] = le.transform(self.df['isLocVisible'])
 
         # encode verifStstus
@@ -87,21 +86,25 @@ class Loader():
         self.df['isViewSizeCustom'] = le.transform(self.df['isViewSizeCustom'])
 
         '''frequency encode'''
-        # # encode uLanguage, creatTimestamp_year, utcOffset
-        # encoder = ce.CountFrequencyCategoricalEncoder(encoding_method='frequency',
-        #                                               variables=['uLanguage'])
-        # # fit the encoder
-        # encoder.fit(self.df)
-        # # transform data
-        # self.df['uLanguagefreq'] = encoder.transform(self.df)
+        #change utcOffset, category, uLanguage  to str
+        self.df['utcOffset']=self.df['utcOffset'].apply(str)
+        self.df['category'] = self.df['category'].apply(str)
+        self.df['uLanguage'] = self.df['uLanguage'].apply(str)
+        # encode uLanguage, category，creatTimestamp_year, utcOffset
+        #print(self.df.isnull().sum())
+        encoder = ce.CountFrequencyCategoricalEncoder(encoding_method='frequency', variables=['uLanguage', 'category', 'creatTimestamp_year', 'utcOffset'])
+        # fit the encoder
+        encoder.fit(self.df)
+        # transform data
+        self.df= encoder.transform(self.df)
 
-        le = LabelEncoder()
-        le.fit(self.df['uLanguage'].unique())
-        self.df['uLanguage'] = le.transform(self.df['uLanguage'])
+        #le = LabelEncoder()
+        #le.fit(self.df['uLanguage'].unique())
+        #self.df['uLanguage'] = le.transform(self.df['uLanguage'])
 
-        le = LabelEncoder()
-        le.fit(self.df['category'].unique())
-        self.df['category'] = le.transform(self.df['category'])
+        #le = LabelEncoder()
+        #le.fit(self.df['category'].unique())
+        #self.df['category'] = le.transform(self.df['category'])
 
         self.extractImg()
         self.extractLoc()
@@ -276,20 +279,18 @@ class Loader():
 class Standardize():
     def __init__(self):
         self.standrdX = StandardScaler()
-        self.standrdY = StandardScaler()
 
-    def fit(self,X,Y):
+    def fit(self,X):
         self.standrdX.fit(X)
-        self.standrdY.fit(Y)
 
-    def transform(self,X,Y=None):
-        if Y is None:
-            return self.standrdX.transform(X,copy=True)
-        else:
-            return self.standrdX.transform(X,copy=True),self.standrdY.transform(Y,copy=True)
+    def transform(self,X):
+        # if Y is None:
+        #     return self.standrdX.transform(X,copy=True)
+        # else:
+        return self.standrdX.transform(X,copy=True)
 
-    def inverse_standarde_y(self,Y):
-        return self.standrdY.inverse_transform(Y)
+    # def inverse_standarde_y(self,Y):
+    #     return self.standrdY.inverse_transform(Y)
 
 class BuildDataset():
     def __init__(self,pickfields=None):
@@ -300,15 +301,14 @@ class BuildDataset():
         df_test,testId = loader_test.loadData('test')
         trainX, trainY = df_train.iloc[:, :-1].values, df_train['numPLikes'].values
         testX= df_test.values
-        trainY = np.expand_dims(trainY, axis=1)
-        self.Ynorm = trainY
-        self.standar.fit(trainX,trainY)
-        self.trainX,self.trainY= self.standar.transform(trainX,trainY)
+        self.standar.fit(trainX)
+        self.trainX= self.standar.transform(trainX)
+        self.trainY = trainY
         self.testX = self.standar.transform(testX)
         self.testId = testId
 
     def getData(self):
-        return self.trainX,self.trainY,self.Ynorm,self.testX,self.testId,self.standar
+        return self.trainX,self.trainY,self.testX,self.testId,self.standar
 
 class ProfileCNN():
     def __init__(self):
