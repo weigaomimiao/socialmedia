@@ -24,7 +24,7 @@ train_x=train_set.loc[:,['numFollowers','numStatUpdate','numDMessage','avgClick'
 train_y=train_set['avgvisitPerSecond'].values
 
 
-# test model with part of data
+# test savedModel with part of data
 Xtrain,Xtest,Ytrain,Ytest=train_test_split(train_x,train_y,test_size=0.3,random_state=420)
 
 # normalization
@@ -52,11 +52,11 @@ model=Ridge(alpha=1,fit_intercept=True,normalize=True).fit(Xtrain_norm,Ytrain_no
 
 model.fit(Xtrain_norm,Ytrain)
 ytest_pred = transformery.inverse_transform(model.predict(Xtest_norm))
-# ytest_pred = model.predict(Xtest_norm)
+# ytest_pred = savedModel.predict(Xtest_norm)
 print(mean_squared_error(Ytest,ytest_pred))
 
 
 # do prediction: fit (train_x, train_y) and then all test_x
-# model.fit(train_xnorm,train_ynorm)
-# print(model.coef_)
-# print(transformery.inverse_transform(model.predict(test_xnorm)))
+# savedModel.fit(train_xnorm,train_ynorm)
+# print(savedModel.coef_)
+# print(transformery.inverse_transform(savedModel.predict(test_xnorm)))

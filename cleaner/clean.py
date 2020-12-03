@@ -339,7 +339,7 @@ class Standardize():
         # if Y is None:
         #     return self.standrdX.transform(X,copy=True)
         # else:
-        self.standrdX.transform(X,copy=True)
+        return self.standrdX.transform(X,copy=True)
 
     def inverse_log10_y(self,Y):
         ypred = np.power(10,Y)-1 # cause y is rescaled as log(1+x)

@@ -9,3 +9,5 @@ You have been provided with various attributes about the visual aspects of the u
 
 There is a CSV file of various collected features that has been provided, in addition to images showing the profile pictures of the users (based on the simulation)
 
+## Feature Engineering
+* Average visit per second is not useful.
