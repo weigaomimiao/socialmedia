@@ -64,7 +64,7 @@ class Loader():
 
         # create_timpstamp_year
         self.df["creatTimestamp_year"] = self.df['creatTimestamp'].apply(lambda x: x.split()[-1]).tolist()
-        # self.df["creatTimestamp_year"] = self.df['creatTimestamp_year'].apply(lambda x: int(x))
+    
         # encode covImgStatus
         le.fit(self.df['covImgStatus'].unique())
         distr = le.classes_
