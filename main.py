@@ -51,7 +51,7 @@ if __name__ == "__main__":
     # savedModel.fit(X, Y)
     model_fit = model.loadModel()
     ypred = model_fit.predict(testX)
-    # ypred = stander.inverse_standarde_y(ypred)
+    ypred = stander.inverse_log10_y(ypred)
 
     # save prediction to csv
     saveResult(testId,ypred)
