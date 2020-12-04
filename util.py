@@ -20,7 +20,7 @@ def getBasePath():
 def saveResult(id,ypred):
     if len(ypred.shape)>1:
         ypred = np.squeeze(ypred,axis=1)
-    df_save = pd.DataFrame({'Id':id,'NumProfileLikes':ypred})
+    df_save = pd.DataFrame({'Id':id,'Predicted':ypred})
     df_save.to_csv('%s/data/submission.csv'%getBasePath(),index=False)
 
 def matplot(df):
