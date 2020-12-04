@@ -17,7 +17,8 @@ from tensorflow.keras.preprocessing import image
 from tensorflow.keras.layers import Input
 from util import getBasePath
 import keras
-
+from keras import backend as K
+import cv2
 class ImgLoader():
     def __init__(self,imgNameList,tasktype='train'):
         self.imgNameList = imgNameList
@@ -42,7 +43,7 @@ class ProfileCNN():
 
     def buildNet(self,xshape):
         # create the base pre-trained model
-        input_tensor = Input(shape=(32, 32, 3),name='img_input') # the shape of profile image
+        input_tensor = Input(shape=xshape,name='img_input') # the shape of profile image
         self.base_model = InceptionV3(input_tensor=input_tensor, weights='imagenet', include_top=False)
 
         # add a global spatial average pooling layer
@@ -94,8 +95,20 @@ class ProfileCNN():
         # alongside the top Dense layers
         self.model.fit(X,y)
 
-    def extracFeas(self,X,model):
-        return model(X)
+    def _get_layer_output(self, x, index=-1):
+        """
+        get the computing result output of any layer you want, default the last layer.
+        :param model: primary model
+        :param x: input of primary model( x of model.predict([x])[0])
+        :param index: index of target layer, i.e., layer[23]
+        :return: result
+        """
+        layer = K.function([self.model.input], [self.model.layers[index].output])
+        return layer([x])[0]
+
+    def extracFeas(self,X):
+        features = self._get_layer_output(X,-3) # the last third layer
+        return features
 
     def savemodel(self):
         self.model.save('%s/savedModel/cnn-pfImg.h5' % getBasePath())
@@ -103,17 +116,59 @@ class ProfileCNN():
     def loadModel(self):
         return keras.models.load_model('%s/savedModel/cnn-pfImg.h5' % getBasePath())
 
+class SIFTExtractor():
+    def __init__(self):
+        pass
+
+    def sift_kp(self,image):
+        # gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2BRG)
+        sift = cv2.xfeatures2d_SIFT.create()
+        kp, des = sift.detectAndCompute(image, None)
+        kp_image = cv2.drawKeypoints(image, kp, None)
+        return kp_image, kp, des
+
+    def extractFeas(self,image):
+        kp_image,kp,des = self.sift_kp(image)
+        return des
+
+    def testAImg(self):
+        image = cv2.imread('%s/train_profile_images/profile_images_train/0A0JRQKK7CLGGDID.png'%(getBasePath()))
+        kp_image, _, des = self.sift_kp(image)
+        print(image.shape, des.shape)
+        cv2.namedWindow('train1', cv2.WINDOW_NORMAL)
+        cv2.imshow('train1', kp_image)
+        if cv2.waitKey(0) == 27:
+            cv2.destroyAllWindows()
+
+
+
 if __name__=='__main__':
     import pandas as pd
     import numpy as np
-    df = pd.read_csv("%s/train.csv"%getBasePath())
-    indexlist_ = ['id', 'uname', 'url', 'covImgStatus', 'verifStatus', 'textColor', 'pageColor', 'themeColor',
-                  'isViewSizeCustom', 'utcOffset', 'location', 'isLocVisible', 'uLanguage', 'creatTimestamp',
-                  'uTimeZone', 'numFollowers', 'numPeopleFollowing', 'numStatUpdate', 'numDMessage', 'category',
-                  'avgvisitPerSecond', 'avgClick', 'profileImg', 'numPLikes']
-    df.columns = indexlist_
 
-    imgNamelist = df['profileImg']
-    bins = [0, 10000, 20000, np.max(df['pNumLikes'])]
-    y = pd.cut(df['pNumLikes'], bins)
-    loader = ImgLoader(imgNameList=imgNamelist,tasktype='train')
+    extractor = SIFTExtractor()
+    extractor.testAImg()
+    pass
+
+    # df = pd.read_csv("%s/train.csv"%getBasePath())
+    # indexlist_ = ['id', 'uname', 'url', 'covImgStatus', 'verifStatus', 'textColor', 'pageColor', 'themeColor',
+    #               'isViewSizeCustom', 'utcOffset', 'location', 'isLocVisible', 'uLanguage', 'creatTimestamp',
+    #               'uTimeZone', 'numFollowers', 'numPeopleFollowing', 'numStatUpdate', 'numDMessage', 'category',
+    #               'avgvisitPerSecond', 'avgClick', 'profileImg', 'numPLikes']
+    # df.columns = indexlist_
+    #
+    # imgNamelist = df['profileImg']
+    # bins = [0, 10000, 20000, np.max(df['pNumLikes'])]
+    # y = pd.cut(df['pNumLikes'], bins)
+    # loader = ImgLoader(imgNameList=imgNamelist,tasktype='train')
+    # X = loader.loadImgs()
+    # xshape = X[0].shape
+    #
+    # net = ProfileCNN(xshape)
+    # net.fit(X,y)
+    # net.savemodel()
+    #
+    # extracter = ProfileCNN()
+    # extracter.loadModel()
+    # feas = extracter.extracFeas(X[:3,:,:,:])
+    # print(feas.shape)

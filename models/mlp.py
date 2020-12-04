@@ -42,7 +42,7 @@ class MLP():
         return model
 
     def fit(self,X,y):
-        history = self.model.fit(X, y,epochs=100, batch_size=50, verbose=0)
+        history = self.model.fit(X, y,epochs=200, batch_size=30, verbose=0)
         print(10*'=')
         print('train loss:', history.history['loss'])
         print('val loss:',history.history['msle'])

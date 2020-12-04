@@ -11,3 +11,4 @@ There is a CSV file of various collected features that has been provided, in add
 
 ## Feature Engineering
 * Average visit per second is not useful.
+* Fit whole dataset rather than KFold.

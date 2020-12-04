@@ -24,12 +24,11 @@ if __name__ == "__main__":
     # fit savedModel with part data and evaluation
     xshape = X.shape[1]
     model = Model(modeltype='mlp',xshape=xshape)
-    kf = KFold(n_splits=15,random_state=None, shuffle=False)
+    kf = KFold(n_splits=15,random_state=None, shuffle=True)
     kf.get_n_splits(X)
     errlist = []
     errtmp = 999999.
     for train_index, val_index in kf.split(X):
-        # print("TRAIN:", train_index, "TEST:", val_index)
         X_train, X_val = X[train_index,:], X[val_index,:]
         y_train, y_val = Ylog[train_index], Y[val_index]
         # y_train, y_val = Y[train_index], Y[val_index]
@@ -48,9 +47,9 @@ if __name__ == "__main__":
 
     # refit whole training set
     # savedModel = Model('mlp')
-    # savedModel.fit(X, Y)
-    model_fit = model.loadModel()
-    ypred = model_fit.predict(testX)
+    model.fit(X, Ylog)
+    # model_fit = model.loadModel()
+    ypred = model.predict(testX)
     ypred = stander.inverse_log10_y(ypred)
 
     # save prediction to csv
