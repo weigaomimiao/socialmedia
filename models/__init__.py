@@ -9,4 +9,4 @@
 @desc:
 '''
 from .model import *
-import numpy as np
+from .finetuning import FineTuning

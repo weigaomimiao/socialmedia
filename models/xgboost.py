@@ -9,17 +9,13 @@
 @desc:
 '''
 import joblib
-from sklearn.ensemble import RandomForestRegressor
+from xgboost import XGBRegressor
 import numpy as np
 from util import getBasePath
 
-class RF(): # random forest
+class XGBoost(): # XGBoost
     def __init__(self):
-        self.model = RandomForestRegressor(n_estimators=100,
-                                           n_jobs=-1,
-                                           bootstrap=True,
-                                           max_depth=10,
-                                           random_state=0)
+        self.model = XGBRegressor(n_jobs=-1,n_estimators=500,learning_rate=0.05,min_child_weight=5,max_depth=6,random_state=0)
 
     def fit(self, X, y):
         ytmp = y
@@ -34,7 +30,7 @@ class RF(): # random forest
         return ypred
 
     def savemodel(self):
-        joblib.dump(self.model,'%s/savedModel/model-rf.joblib' % getBasePath(),compress=0)
+        joblib.dump(self.model,'%s/savedModel/model-xgboost.joblib' % getBasePath(),compress=0)
 
     def loadModel(self):
-        return joblib.load('%s/savedModel/model-rf.joblib' % getBasePath())
+        return joblib.load('%s/savedModel/model-xgboost.joblib' % getBasePath())

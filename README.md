@@ -12,3 +12,9 @@ There is a CSV file of various collected features that has been provided, in add
 ## Feature Engineering
 * Average visit per second is not useful.
 * Fit whole dataset rather than KFold.
+
+## Notes of scores
+* Dec. 5: 2.17
+outlier (0.75), log(1.5+x), old fillavgClick, mlp
+* Dec. 6: 1.75
+new fillavgClick, xgboost (not fine tuned), dummy_one_hot, train and test together to be cleaned and normalized

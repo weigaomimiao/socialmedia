@@ -11,122 +11,83 @@
 
 import pandas as pd
 import numpy as np
-import util
-from sklearn.preprocessing import StandardScaler
+
 from sklearn.preprocessing import LabelEncoder
 from sklearn.cluster import KMeans
 from sklearn.linear_model import Ridge
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.neighbors import KNeighborsClassifier
-from feature_engine import categorical_encoders as ce
 from sklearn.feature_selection import SelectKBest, mutual_info_regression
-
-class Loader():
-    def __init__(self,pickfields=None):
+from sklearn.preprocessing import OneHotEncoder
+from sklearn.preprocessing import StandardScaler
+class Cleaner():
+    '''
+    Only for cleaning data x, y is handled in BuildDataset()
+    '''
+    def __init__(self):
         self.df = None
+        self.pickIndStart = -1 # the start index of picking fields
+        # self.indexlist_ = ['id','uname','url','covImgStatus','verifStatus','textColor','pageColor','themeColor','isViewSizeCustom','utcOffset','location','isLocVisible','uLanguage','creatTimestamp','uTimeZone','numFollowers','numPeopleFollowing','numStatUpdate','numDMessage','category','avgvisitPerSecond','avgClick','profileImg','numPLikes']
+        # if pickfields is None:
+        #     self.pickFields_ = ['utcOffset', 'creatTimestamp_year','numDMessageLog','numStatUpdateLog','numFollowersLog','numPeopleFollowingLog','utcOffset', 'creatTimestamp_year','hasUrl','category','verifStatus','textClass','pageClass','themeClass','isLocVisible','uLanguage','isViewSizeCustom']
+        # else:
+        #     self.pickFields_ = pickfields
 
-        self.indexlist_ = ['id','uname','url','covImgStatus','verifStatus','textColor','pageColor','themeColor','isViewSizeCustom','utcOffset','location','isLocVisible','uLanguage','creatTimestamp','uTimeZone','numFollowers','numPeopleFollowing','numStatUpdate','numDMessage','category','avgvisitPerSecond','avgClick','profileImg','numPLikes']
-        self.stander = StandardScaler() # for standardization if needed
-        if pickfields is None:
-            self.pickFields_ = ['numPeopleFollowingLog','hasUrl','avgClickLog','category','verifStatus','numFollowersLog','textClass','pageClass','themeClass','numDMessageLog','numStatUpdateLog','isLocVisible','uLanguage','utcOffset', 'creatTimestamp_year','isViewSizeCustom','numPLikes','numPLikesLog']
-        else:
-            self.pickFields_ = pickfields
-
-    def loadData(self,dataset):
-        self.dataset = dataset
-        basepath = util.getBasePath()
-        astr = "%s/data/%s.csv"
-        if dataset not in ['train','test']:
-            print("Invalid dataset type, only train and test are supported")
-            return ""
-        filename = astr % (basepath, dataset)
-        self.df = pd.read_csv(filename)
-        if dataset == 'test':
-            self.df.columns = self.indexlist_[:-1]
-        else:
-            self.df.columns = self.indexlist_
-
+    def cleanData(self,df):
+        # self.dataset = dataset
+        # basepath = util.getBasePath()
+        # astr = "%s/data/%s.csv"
+        # if dataset not in ['train','test']:
+        #     print("Invalid dataset type, only train and test are supported")
+        #     return ""
+        # filename = astr % (basepath, dataset)
+        # self.df = pd.read_csv(filename)
+        # if dataset == 'test':
+        #     self.df.columns = self.indexlist_[:-1]
+        # else:
+        #     self.df.columns = self.indexlist_
+        self.df = df
+        del df
         self.fillna()
-        self.recodeData() # encode discrete features
-        self.rescaleData() # take logarithmic of numerical features
+        self.outlier_dealing()
+        self.buildFeatures()
+        # self.outlier_dealing()
+        self.onehotencode() # encode discrete features
+        self.rescaleData()  # take logarithmic of numerical features
+        self.cut2box() # cut continuous data
         # self.processInf() # replace inf,-inf
-
-        if(dataset=='train'):
-            return self.df[self.pickFields_]
-        else:
-            return self.df[self.pickFields_[:-2]],self.df['id']
+        return self.df
+        # if(dataset=='train'):
+        #     return self.df[self.pickFields_]
+        # else:
+        #     return self.df[self.pickFields_[:-2]],self.df['id']
 
     def rescaleData(self):
-        self.df['numFollowers'].replace(0,0.5)
-        self.df['numFollowersLog'] = self.df['numFollowers'].map(lambda x: np.log10(1+x))
+        self.df['numFollowersLog'] = self.df['numFollowers'].map(lambda x: np.log10(1.5+x))
+        self.df['numPeopleFollowingLog'] = self.df['numPeopleFollowing'].map(lambda x: np.log10(1.5+x))
+        self.df['numStatUpdateLog'] = self.df['numStatUpdate'].map(lambda x: np.log10(1.5+x))
+        self.df['numDMessageLog'] = self.df['numDMessage'].map(lambda x: np.log10(1.5+x))
+        self.df['avgClickLog'] = self.df['avgClick'].map(lambda x: np.log10(1.5+x))
+        # if(self.dataset=='train'):
+        #     self.df['numPLikesLog'] = self.df['numPLikes'].map(lambda x: np.log10(1.5+x))
 
-        self.df['numPeopleFollowing'].replace(0,0.5) # in case log10(1)
-        self.df['numPeopleFollowingLog'] = self.df['numPeopleFollowing'].map(lambda x: np.log10(1+x))
-        # print(self.df['numPeopleFollowingLog'].isin([-np.inf]).sum())
-
-        self.df['numStatUpdate'].replace(0,0.5)
-        self.df['numStatUpdateLog'] = self.df['numStatUpdate'].map(lambda x: np.log10(1+x))
-
-
-
-        self.df['numDMessage'].replace(0,0.5)
-        # print((self.df['numPeopleFollowing'] < 0).sum())
-        self.df['numDMessageLog'] = self.df['numDMessage'].map(lambda x: np.log10(1+x))
-        # print(self.df['numDMessageLog'].isin([-np.inf]).sum())
-
-        self.df['avgClick'].replace(0,0.5)
-        self.df['avgClickLog'] = self.df['avgClick'].map(lambda x: np.log10(1+x))
-
-        if(self.dataset=='train'):
-            self.df['numPLikes'].replace(0,0.5)
-            self.df['numPLikesLog'] = self.df['numPLikes'].map(lambda x: np.log10(1+x))
-
-    def recodeData(self):
+    def buildFeatures(self):
         # field Personal URL: 1 for not null, 0 for null
-        # Then enconde hasurl
-        self.df['hasUrl'] = self.df['url'].isnull()
-        le = LabelEncoder()
-        le.fit(self.df['hasUrl'].unique())
-        self.df['hasUrl'] = le.transform(self.df['hasUrl'])
-
-        # create_timpstamp_year
-        self.df["creatTimestamp_year"] = self.df['creatTimestamp'].apply(lambda x: x.split()[-1]).tolist()
-        # self.df["creatTimestamp_year"] = self.df['creatTimestamp_year'].apply(lambda x: int(x))
-        # encode covImgStatus
-        le.fit(self.df['covImgStatus'].unique())
-        distr = le.classes_
-        di = {distr[0]: 0, distr[1]: 1, distr[2]: 2}
-        self.df.replace({"covImgStatus": di})
-
-        # encode islocVisible
-        le.fit(self.df['isLocVisible'].unique())
-        self.isLocVisible_lowercase()
-        self.df['isLocVisible'] = le.transform(self.df['isLocVisible'])
-
-        # encode verifStstus
-        le = LabelEncoder()
-        le.fit(self.df['verifStatus'].unique())
-        self.df['verifStatus'] = le.transform(self.df['verifStatus'])
-
-        # encode isViewSizeCustom
-        le = LabelEncoder()
-        le.fit(self.df['isViewSizeCustom'].unique())
-        self.df['isViewSizeCustom'] = le.transform(self.df['isViewSizeCustom'])
 
         '''frequency encode'''
-        # change utcOffset, category, uLanguage  to str
-        self.df['utcOffset'] = self.df['utcOffset'].apply(str)
-        self.df['category'] = self.df['category'].apply(str)
-        self.df['uLanguage'] = self.df['uLanguage'].apply(str)
-        # encode uLanguage, category，creatTimestamp_year, utcOffset
-        # print(self.df.isnull().sum())
-        encoder = ce.CountFrequencyCategoricalEncoder(encoding_method='frequency',
-                                                      variables=['uLanguage', 'category', 'creatTimestamp_year',
-                                                                 'utcOffset'])
-        # fit the encoder
-        encoder.fit(self.df)
-        # transform data
-        self.df = encoder.transform(self.df)
+        # # change utcOffset, category, uLanguage  to str
+        # self.df['utcOffset'] = self.df['utcOffset'].apply(str)
+        # self.df['category'] = self.df['category'].apply(str)
+        # self.df['uLanguage'] = self.df['uLanguage'].apply(str)
+        # # encode uLanguage, category，creatTimestamp_year, utcOffset
+        # # print(self.df.isnull().sum())
+        # encoder = ce.CountFrequencyCategoricalEncoder(encoding_method='frequency',
+        #                                               variables=['uLanguage', 'category', 'creatTimestamp_year',
+        #                                                          'utcOffset'])
+        # # fit the encoder
+        # encoder.fit(self.df)
+        # # transform data
+        # self.df = encoder.transform(self.df)
 
         # le = LabelEncoder()
         # le.fit(self.df['uLanguage'].unique())
@@ -135,10 +96,38 @@ class Loader():
         # le = LabelEncoder()
         # le.fit(self.df['category'].unique())
         # self.df['category'] = le.transform(self.df['category'])
-
+        self.classifyColor()
         self.extractImg()
         self.extractLoc()
+        self.df['hasUrl'] = self.df['url'].isnull()
+        self.df['hasUrl'] = self.df['hasUrl'].map(str)
+        # featu
+        self.pickIndStart = self.df.shape[1]
 
+        self.df['utcOffset_hour'] = self.df['utcOffset'] / 3600
+        create_year = self.df['creatTimestamp'].apply(lambda x: x.split()[-1]).tolist()
+        create_year = [int(i) for i in create_year]
+        self.df["creatTimestamp_year"] = create_year
+
+    def onehotencode(self):
+        self.df['isLocVisible'] = self.df['isLocVisible'].str.lower()
+        self.df['covImgStatus'].fillna('Set', inplace=True)
+        category = self.df.loc[:,
+                   ['hasUrl', 'covImgStatus', 'verifStatus', 'isViewSizeCustom', 'isLocVisible', 'uLanguage','textClass','pageClass','themeClass']]
+        # labelcoder = LabelEncoder()
+        # for column in category:
+        #     self.df[column] = labelcoder.fit_transform(self.df[column])
+        # category = self.df.loc[:,
+        #            ['hasUrl', 'covImgStatus', 'verifStatus', 'isViewSizeCustom', 'isLocVisible', 'uLanguage','textClass','pageClass','themeClass']]
+        # cat_num = category.shape[-1]
+        # category = np.reshape(np.array(category), (-1, cat_num))
+        # onehotcoder = OneHotEncoder()
+        # labelfeatures = onehotcoder.fit_transform(category)
+        category_df = pd.get_dummies(category, dummy_na=True)
+
+        # pd.concat((self.df,pd.DataFrame('':labelfeatures)))
+        # self.df['labelfeatures'] = labelfeatures
+        self.df = pd.concat([self.df,category_df],axis=1,ignore_index=False)
 
     def extractLoc(self):
         # extract features from field "location"
@@ -146,9 +135,6 @@ class Loader():
 
     def extractImg(self):
         # extract features from profile image
-        # y = self.df['numPLike']
-
-        # self.df['newNameImg'] = "blabla"
         pass
 
     def classifyColor(self):
@@ -196,9 +182,9 @@ class Loader():
         self.df['dfthemer'] = dfthemer
         self.df['dfthemeg'] = dfthemeg
         self.df['dfthemeb'] = dfthemeb
-        self.df['textClass'] = kmeans_text.labels_
-        self.df['pageClass'] = kmeans_page.labels_
-        self.df['themeClass'] = kmeans_theme.labels_
+        self.df['textClass'] = [str(int(i)) for i in kmeans_text.labels_]
+        self.df['pageClass'] = [str(int(i)) for i in kmeans_page.labels_]
+        self.df['themeClass'] = [str(int(i)) for i in kmeans_theme.labels_]
 
     def fillcategory(self):
         # feature use: verifystatus, hasurl, islocvisible, numstatsupdate
@@ -250,6 +236,19 @@ class Loader():
         filled_data = filled_data.sort_index()
         self.df['category'] = filled_data['category']
 
+        # change outlier to 1/4point +\- (1.5* 1/4high \ 1/4low)
+    def outlier_dealing(self):
+        numeric_columns = self.df.loc[:,['numFollowers', 'numPeopleFollowing', 'numStatUpdate', 'numDMessage', 'avgClick']]
+        for column in numeric_columns:
+            set = self.df[column]
+            qu_high = set.quantile(q=0.75)
+            qu_low = set.quantile(q=0.25)
+            value = qu_high - qu_low
+            top = qu_high + 1.5 * value
+            bottom = qu_low - 1.5 * value
+            set.where(cond=(set < top), other=top, inplace=True)
+            set.where(cond=(set > bottom), other=bottom, inplace=True)
+            self.df[column] = set
 
     def fillavgclick(self):
         # feature using: verifStatus,hasurl,category
@@ -293,7 +292,7 @@ class Loader():
         test_x = test_set.loc[:, ['verifStatus', 'url', 'category', 'numPeopleFollowing', 'numFollowers']]
         test_x['avgClick'] = res
 
-        #replace NaN in avgClick by predicton result
+        # replace NaN in avgClick by predicton result
         filled_data = pd.concat([train_set, test_x], axis=0)
         filled_data = filled_data.sort_index()
         self.df['avgClick'] = filled_data['avgClick']
@@ -304,93 +303,46 @@ class Loader():
 
     def fillna(self):
         # filling all blanks, can call like fillLoc etc.
-        self.df['covImgStatus'].fillna('unknown', inplace=True)
-        # fill location
+        # self.df['covImgStatus'].fillna('unknown', inplace=True)
+        # fill utcOffset
+        self.df['utcOffset'].fillna(0,inplace=True)
         self.fillLoc()
         self.fillcategory()
         self.fillavgclick()
-        self.classifyColor()
 
-    # def processInf(self):
-    #     self.df.replace(np.inf,999999)
-    #     self.df.replace(-np.inf, 1e7)
+
 
     def fillLoc(self):
         # filling?
         pass
 
-    def cutPNumLikes(self): # only do it for training set
-        if(self.dataset=='test'):
-            return
-        bins = [0,10000,20000,np.max(self.df['pNumLikes'])]
-        self.df['pNumLikesClass'] = pd.cut(self.df['pNumLikes'],bins)
+    def cut2box(self):
+        '''
+        Discretize numerical continuous data
+        :return:
+        '''
+        pass
 
-
+    def getPickIndex(self):
+        '''
+        Return the begining index for picking fields, the picked df will be df.iloc[:][self.pickIndStart:]
+        :return:
+        '''
+        return self.pickIndStart
 class Standardize():
     def __init__(self):
         self.standrdX = StandardScaler()
-        # self.standrdY = lambda x: np.power(10,x)
 
     def fit(self,X):
         self.standrdX.fit(X)
-        # self.standrdY.fit(Y)
 
     def transform(self,X):
-        # if Y is None:
-        #     return self.standrdX.transform(X,copy=True)
-        # else:
         return self.standrdX.transform(X,copy=True)
 
     def inverse_log10_y(self,Y):
-        ypred = np.power(10,Y)-1 # cause y is rescaled as log(1+x)
+        ypred = np.power(10,Y)-1.5 # cause y is rescaled as log(1+x)
         ypred = np.ceil(ypred).astype(int)
         return ypred
-
-class BuildDataset():
-    def __init__(self,kbest=15,pickfields=None):
-        self.standar = Standardize() # for standardization
-        if(kbest>0):
-            self.selector = FeaSelector(kbest) # for selecting features
-        loader_train = Loader(pickfields)
-        loader_test = Loader(pickfields)
-        df_train = loader_train.loadData('train')
-
-        # plot corr-heatmap
-        util.matplot(df_train)
-        # take values
-        df_test,testId = loader_test.loadData('test')
-        trainX, trainLogY = df_train.iloc[:, :-2].values, df_train['numPLikesLog'].values
-        # test inf
-        # tmp = np.isinf(trainX).sum(axis=0)
-
-        trainY = df_train['numPLikes'].values
-        testX= df_test.values
-
-        # fitting selector and standar
-        if(kbest>0):
-            self.selector.fit(trainX,trainLogY)
-        self.standar.fit(trainX)
-
-        # train set: standardization and feature selection x
-        self.trainX= self.standar.transform(trainX)
-        if(kbest>0):
-            self.trainX = self.selector.select(self.trainX)
-        # test set: standardization and feature selection
-        self.testX = self.standar.transform(testX)
-        if(kbest>0):
-            self.testX = self.selector.select(self.testX)
-
-        # set y, expand dims for model
-        trainLogY = np.expand_dims(trainLogY, axis=1)
-        self.trainLogY = trainLogY
-        self.trainY = np.expand_dims(trainY, axis=1)
-
-        self.testId = testId
-
-    def getData(self):
-        return self.trainX,self.trainY,self.trainLogY,self.testX,self.testId,self.standar
-
-
 class FeaSelector():
     def __init__(self,k):
         self.selector = SelectKBest(mutual_info_regression,k=k)

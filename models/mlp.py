@@ -13,7 +13,7 @@ from keras import layers
 import numpy as np
 import keras
 import tensorflow as tf
-from util import getBasePath
+from util import getBasePath,trainvalLossPlot
 from keras.optimizers import RMSprop
 
 class MLP():
@@ -37,7 +37,7 @@ class MLP():
         #     decay_steps=100,
         #     decay_rate=0.9)
         opt = keras.optimizers.SGD(learning_rate=1e-2)
-        model.compile(optimizer=opt, loss='mse', metrics=['msle'])
+        model.compile(optimizer=opt, loss='mse', metrics=['mse'])
 
         return model
 
@@ -45,7 +45,10 @@ class MLP():
         history = self.model.fit(X, y,epochs=200, batch_size=30, verbose=0)
         print(10*'=')
         print('train loss:', history.history['loss'])
-        print('val loss:',history.history['msle'])
+        print('val loss:',history.history['mse'])
+        print('mean val loss',np.mean(history.history['mse']))
+
+        trainvalLossPlot(history.history['loss'],history.history['mse'],'mlp')
 
     def predict(self,X):
         return self.model.predict(X)

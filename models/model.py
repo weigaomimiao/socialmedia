@@ -10,7 +10,7 @@
 '''
 from .mlp import MLP
 from .rf import RF
-
+from .xgboost import XGBoost
 
 class Model():
     def __init__(self,xshape,modeltype='mlp'):
@@ -21,6 +21,8 @@ class Model():
             return MLP(xshape)
         elif modeltype=='rf':
             return RF()
+        elif modeltype=='xgboost':
+            return XGBoost()
         return None
 
     def fit(self,X,y):
