@@ -12,51 +12,18 @@ import pandas as pd
 import numpy as np
 from util import getBasePath
 from .clean import FeaSelector,Standardize,Cleaner
-# class Loader():
-#     def __init__(self,pickfields=None):
-#         self.df = None
-#         self.indexlist_ = ['id','uname','url','covImgStatus','verifStatus','textColor','pageColor','themeColor','isViewSizeCustom','utcOffset','location','isLocVisible','uLanguage','creatTimestamp','uTimeZone','numFollowers','numPeopleFollowing','numStatUpdate','numDMessage','category','avgvisitPerSecond','avgClick','profileImg','numPLikes']
-#         if pickfields is None:
-#             self.pickFields_ = ['utcOffset','creatTimestamp_year','avgClickLog','numDMessageLog','numStatUpdateLog','numFollowersLog','numPeopleFollowingLog', 'hasUrl','category','verifStatus','textClass','pageClass','themeClass','isLocVisible','uLanguage','isViewSizeCustom']
-#         else:
-#             self.pickFields_ = pickfields
-#
-#     # def loadData(self,dataset):
-#     #     self.dataset = dataset
-#     #     basepath = getBasePath()
-#     #     astr = "%s/data/%s.csv"
-#     #     if dataset not in ['train','test']:
-#     #         print("Invalid dataset type, only train and test are supported")
-#     #         return ""
-#     #     filename = astr % (basepath, dataset)
-#     #     df = pd.read_csv(filename)
-#     #     if dataset == 'test':
-#     #         df.columns = indexlist_[:-1]
-#     #     else:
-#     #         df.columns = indexlist_
-#     #     return df
-
-        # self.fillna()
-        # self.buildFeatures()
-        # self.outlier_dealing()
-        # self.onehotencode() # encode discrete features
-        # self.rescaleData()  # take logarithmic of numerical features
-        # # self.processInf() # replace inf,-inf
-        #
-        # if(dataset=='train'):
-        #     return self.df[self.pickFields_]
-        # else:
-        #     return self.df[self.pickFields_[:-2]],self.df['id']
 
 class BuildDataset():
-    def __init__(self,kbest=15,pickfields=None):
+    def __init__(self,kbest=15,notPickfields=None):
         self.standar = Standardize() # for standardization
-        if pickfields is None:
+        if notPickfields is None:
             # self.pickFields_ = ['utcOffset','creatTimestamp_year','avgClickLog','numDMessageLog','numStatUpdateLog','numFollowersLog','numPeopleFollowingLog', 'hasUrl','category','verifStatus','textClass','pageClass','themeClass','isLocVisible','uLanguage','isViewSizeCustom']
-            self.pickFields_ = ['utcOffset', 'creatTimestamp_year', 'avgClickLog', 'numDMessageLog', 'numStatUpdateLog',
-                                'numFollowersLog', 'numPeopleFollowingLog','labelfeatures' ]
+            self.notPickfields_ = ['id', 'uname', 'url', 'covImgStatus', 'verifStatus', 'textColor', 'pageColor', 'themeColor',
+                      'isViewSizeCustom', 'utcOffset', 'location', 'isLocVisible', 'uLanguage', 'creatTimestamp',
+                      'uTimeZone', 'numFollowers', 'numPeopleFollowing', 'numStatUpdate', 'numDMessage',
+                      'category', 'avgvisitPerSecond', 'avgClick', 'profileImg', 'numPLikes','hasUrl']
         else:
-            self.pickFields_ = pickfields
+            self.notPickfields_ = notPickfields
         self.kbest = kbest
         if(kbest>0):
             self.selector = FeaSelector(kbest) # for selecting features
@@ -69,17 +36,6 @@ class BuildDataset():
         # set y, expand dims for model
         trainY = df_train['numPLikes'].values
         trainLogY = [np.log10(1.5 + i) for i in trainY]
-
-        # loader_train = Loader(pickfields)
-        # loader_test = Loader(pickfields)
-        # df_train = loader_train.loadData('train')
-
-        # plot corr-heatmap
-        # util.matplot(df_train)
-        # take values
-        # df_test,testId = self.loadData('test')
-
-        # clean x
 
         # clean
         df_trainX, df_testX = self.cleanData(df_train.iloc[:, :-1], df_test)
@@ -122,13 +78,16 @@ class BuildDataset():
         :return:
         '''
         train_size = df_train.shape[0]
-        # test_size = df_test.shape[0]
         df = pd.concat([df_train,df_test],ignore_index=True)
 
         df_new = self.cleaner.cleanData(df)
         pickStartInd = self.cleaner.pickIndStart
 
-        df_picked = df_new.iloc[:,pickStartInd:]
+        columns = df_new.columns.values
+        column_picked = set(columns).difference(set(self.notPickfields_))
+
+        # df_picked = df_new.iloc[:,pickStartInd:]
+        df_picked = df_new[column_picked]
         x_train = df_picked.iloc[:train_size,:]
         x_test = df_picked.iloc[train_size:, :]
         return x_train,x_test

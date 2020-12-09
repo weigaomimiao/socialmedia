@@ -34,18 +34,6 @@ class Cleaner():
         #     self.pickFields_ = pickfields
 
     def cleanData(self,df):
-        # self.dataset = dataset
-        # basepath = util.getBasePath()
-        # astr = "%s/data/%s.csv"
-        # if dataset not in ['train','test']:
-        #     print("Invalid dataset type, only train and test are supported")
-        #     return ""
-        # filename = astr % (basepath, dataset)
-        # self.df = pd.read_csv(filename)
-        # if dataset == 'test':
-        #     self.df.columns = self.indexlist_[:-1]
-        # else:
-        #     self.df.columns = self.indexlist_
         self.df = df
         del df
         self.fillna()
@@ -55,12 +43,7 @@ class Cleaner():
         self.onehotencode() # encode discrete features
         self.rescaleData()  # take logarithmic of numerical features
         self.cut2box() # cut continuous data
-        # self.processInf() # replace inf,-inf
         return self.df
-        # if(dataset=='train'):
-        #     return self.df[self.pickFields_]
-        # else:
-        #     return self.df[self.pickFields_[:-2]],self.df['id']
 
     def rescaleData(self):
         self.df['numFollowersLog'] = self.df['numFollowers'].map(lambda x: np.log10(1.5+x))
@@ -68,40 +51,15 @@ class Cleaner():
         self.df['numStatUpdateLog'] = self.df['numStatUpdate'].map(lambda x: np.log10(1.5+x))
         self.df['numDMessageLog'] = self.df['numDMessage'].map(lambda x: np.log10(1.5+x))
         self.df['avgClickLog'] = self.df['avgClick'].map(lambda x: np.log10(1.5+x))
-        # if(self.dataset=='train'):
-        #     self.df['numPLikesLog'] = self.df['numPLikes'].map(lambda x: np.log10(1.5+x))
 
     def buildFeatures(self):
-        # field Personal URL: 1 for not null, 0 for null
-
-        '''frequency encode'''
-        # # change utcOffset, category, uLanguage  to str
-        # self.df['utcOffset'] = self.df['utcOffset'].apply(str)
-        # self.df['category'] = self.df['category'].apply(str)
-        # self.df['uLanguage'] = self.df['uLanguage'].apply(str)
-        # # encode uLanguage, category，creatTimestamp_year, utcOffset
-        # # print(self.df.isnull().sum())
-        # encoder = ce.CountFrequencyCategoricalEncoder(encoding_method='frequency',
-        #                                               variables=['uLanguage', 'category', 'creatTimestamp_year',
-        #                                                          'utcOffset'])
-        # # fit the encoder
-        # encoder.fit(self.df)
-        # # transform data
-        # self.df = encoder.transform(self.df)
-
-        # le = LabelEncoder()
-        # le.fit(self.df['uLanguage'].unique())
-        # self.df['uLanguage'] = le.transform(self.df['uLanguage'])
-        #
-        # le = LabelEncoder()
-        # le.fit(self.df['category'].unique())
-        # self.df['category'] = le.transform(self.df['category'])
         self.classifyColor()
         self.extractImg()
         self.extractLoc()
+
         self.df['hasUrl'] = self.df['url'].isnull()
         self.df['hasUrl'] = self.df['hasUrl'].map(str)
-        # featu
+        # feature starting ID, do put the line below after hasUrl
         self.pickIndStart = self.df.shape[1]
 
         self.df['utcOffset_hour'] = self.df['utcOffset'] / 3600
@@ -114,19 +72,7 @@ class Cleaner():
         self.df['covImgStatus'].fillna('Set', inplace=True)
         category = self.df.loc[:,
                    ['hasUrl', 'covImgStatus', 'verifStatus', 'isViewSizeCustom', 'isLocVisible', 'uLanguage','textClass','pageClass','themeClass']]
-        # labelcoder = LabelEncoder()
-        # for column in category:
-        #     self.df[column] = labelcoder.fit_transform(self.df[column])
-        # category = self.df.loc[:,
-        #            ['hasUrl', 'covImgStatus', 'verifStatus', 'isViewSizeCustom', 'isLocVisible', 'uLanguage','textClass','pageClass','themeClass']]
-        # cat_num = category.shape[-1]
-        # category = np.reshape(np.array(category), (-1, cat_num))
-        # onehotcoder = OneHotEncoder()
-        # labelfeatures = onehotcoder.fit_transform(category)
         category_df = pd.get_dummies(category, dummy_na=True)
-
-        # pd.concat((self.df,pd.DataFrame('':labelfeatures)))
-        # self.df['labelfeatures'] = labelfeatures
         self.df = pd.concat([self.df,category_df],axis=1,ignore_index=False)
 
     def extractLoc(self):
@@ -173,15 +119,15 @@ class Cleaner():
         theme_vec = np.concatenate((dfthemer, dfthemeg, dfthemeb), axis=1)
         kmeans_theme = KMeans(n_clusters=5).fit(theme_vec)
 
-        self.df['dftextr'] = dftextr
-        self.df['dftextg'] = dftextg
-        self.df['dftextb'] = dftextb
-        self.df['dfpager'] = dfpager
-        self.df['dfpageg'] = dfpageg
-        self.df['dfpageb'] = dfpageb
-        self.df['dfthemer'] = dfthemer
-        self.df['dfthemeg'] = dfthemeg
-        self.df['dfthemeb'] = dfthemeb
+        # self.df['dftextr'] = dftextr
+        # self.df['dftextg'] = dftextg
+        # self.df['dftextb'] = dftextb
+        # self.df['dfpager'] = dfpager
+        # self.df['dfpageg'] = dfpageg
+        # self.df['dfpageb'] = dfpageb
+        # self.df['dfthemer'] = dfthemer
+        # self.df['dfthemeg'] = dfthemeg
+        # self.df['dfthemeb'] = dfthemeb
         self.df['textClass'] = [str(int(i)) for i in kmeans_text.labels_]
         self.df['pageClass'] = [str(int(i)) for i in kmeans_page.labels_]
         self.df['themeClass'] = [str(int(i)) for i in kmeans_theme.labels_]

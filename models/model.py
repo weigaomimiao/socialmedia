@@ -12,6 +12,7 @@ from .mlp import MLP
 from .rf import RF
 from .xgboost import XGBoost
 
+
 class Model():
     def __init__(self,xshape,modeltype='mlp'):
         self.model = self.initmodel(modeltype,xshape)
@@ -36,4 +37,10 @@ class Model():
 
     def loadModel(self):
         return self.model.loadModel()
+
+    def get_params(self, deep=True):
+        return self.model.get_params(deep=deep)
+
+    def set_params(self, **params):
+        self.model.set_params(params)
 
