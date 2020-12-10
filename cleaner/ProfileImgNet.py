@@ -8,16 +8,17 @@
 @time: 2020/12/3 13:57
 @desc:
 '''
-from tensorflow.keras.applications.inception_v3 import InceptionV3
-from tensorflow.keras.preprocessing import image
+from tensorflow.keras.applications.vgg16 import VGG16
+# from tensorflow.keras.preprocessing import image
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Dense, GlobalAveragePooling2D
 from tensorflow.keras.optimizers import SGD
 from tensorflow.keras.preprocessing import image
 from tensorflow.keras.layers import Input
 from util import getBasePath
-import keras
 from keras import backend as K
+import tensorflow as tf
+import os
 
 class ImgLoader():
     def __init__(self, imgNameList, tasktype='train'):
@@ -26,34 +27,46 @@ class ImgLoader():
             print("please set tasktype as train or test")
         self.tasktype = tasktype
         self.imgList = []
-        self.imgBasePath = "%s/%s_profile_images/profile_images_%s" % (getBasePath(), self.tasktype, self.tasktype)
+        self.imgBasePath = "%s/../data/%s_profile_images/profile_images_%s" % (getBasePath(), self.tasktype, self.tasktype)
+        self.imgExisIndex = []
 
     def loadImgs(self):
         for aimg in self.imgNameList:
-            img = image.load_img("%s/%s" % (self.imgBasePath, aimg), target_size=(32, 32))
-            self.imgList.append(img)
+            apath = (self.imgBasePath+"/%s")% aimg
+            if(not os.path.exists(apath)):
+                self.imgExisIndex.append(False)
+                continue
+            else:
+                self.imgExisIndex.append(True)
+                img = image.load_img(apath, target_size=(64, 64),color_mode='rgb',interpolation='nearest')
+                img = np.array(image.img_to_array(img))
+                self.imgList.append(img)
 
-        return self.imgList / 255
+        return np.array(self.imgList )/ 255, self.imgExisIndex
 
 
 class ProfileCNN():
-    def __init__(self):
+    def __init__(self,xshape,yclassNum=10,epochs=1,feaDim=512):
         self.model = None
+        self.xshape_ = xshape
+        self.yclassNum_ = yclassNum
+        self.epochs = epochs
+        self.feaDim = feaDim
         self.buildNet()
 
-    def buildNet(self, xshape):
+    def buildNet(self):
         # create the base pre-trained model
-        input_tensor = Input(shape=xshape, name='img_input')  # the shape of profile image
-        self.base_model = InceptionV3(input_tensor=input_tensor, weights='imagenet', include_top=False)
+        input_tensor = Input(shape=self.xshape_, name='img_input')  # the shape of profile image
+        self.base_model = VGG16(input_tensor=input_tensor, weights='imagenet', include_top=False)
 
         # add a global spatial average pooling layer
         x = self.base_model.output
         x = GlobalAveragePooling2D()(x)
         # let's add a fully-connected layer
-        x = Dense(512, activation='relu', name='fc1')(x)
-        x = Dense(256, activation='relu', name='fc2')(x)
+        x = Dense(self.feaDim, activation='relu', name='fc1')(x)
+        x = Dense(self.feaDim/2, activation='relu', name='fc2')(x)
         # and a logistic layer -- let's say we have 3 classes
-        predictions = Dense(3, activation='softmax')(x)
+        predictions = Dense(self.yclassNum_, activation='softmax')(x)
 
         # this is the model we will train
         self.model = Model(inputs=self.base_model.input, outputs=predictions)
@@ -79,11 +92,11 @@ class ProfileCNN():
         for i, layer in enumerate(self.base_model.layers):
             print(i, layer.name)
 
-        # we chose to train the top 2 inception blocks, i.e. we will freeze
-        # the first 249 layers and unfreeze the rest:
-        for layer in self.model.layers[:249]:
+        # we chose to train the top 2 blocks, i.e. we will freeze
+        # the first 16 layers and unfreeze the rest:
+        for layer in self.model.layers[:16]:
             layer.trainable = False
-        for layer in self.model.layers[249:]:
+        for layer in self.model.layers[16:]:
             layer.trainable = True
 
         # we need to recompile the model for these modifications to take effect
@@ -93,7 +106,7 @@ class ProfileCNN():
 
         # we train our model again (this time fine-tuning the top 2 inception blocks
         # alongside the top Dense layers
-        self.model.fit(X, y)
+        self.model.fit(X, y,epochs=self.epochs)
 
     def _get_layer_output(self, x, index=-1):
         """
@@ -111,10 +124,10 @@ class ProfileCNN():
         return features
 
     def savemodel(self):
-        self.model.save('%s/savedModel/cnn-pfImg.h5' % getBasePath())
+        self.model.save('%s/../savedModel/cnn-pfImg.h5' % getBasePath())
 
     def loadModel(self):
-        return keras.models.load_model('%s/savedModel/cnn-pfImg.h5' % getBasePath())
+        return tf.keras.models.load_model('%s/../savedModel/cnn-pfImg.h5' % getBasePath())
 
 
 
@@ -138,17 +151,21 @@ if __name__ == '__main__':
     imgNamelist_train = df_train['profileImg'].values
     imgNamelist_test = df_test['profileImg'].values
 
-    # bins = [0, 10000, 20000, np.max(df['pNumLikes'])]
-    # y = pd.cut(df['pNumLikes'], bins)
-    # loader = ImgLoader(imgNameList=imgNamelist,tasktype='train')
-    # X = loader.loadImgs()
-    # xshape = X[0].shape
-    #
-    # net = ProfileCNN(xshape)
-    # net.fit(X,y)
+    yclassNum = 50
+    df_train['numPLikeslog'] = df_train['numPLikes'].map(lambda x: np.log10(1.5+x))
+    y = pd.get_dummies(pd.cut(df_train['numPLikeslog'], yclassNum)).values
+    loader = ImgLoader(imgNameList=imgNamelist_train,tasktype='train')
+    trainX,imgExisIndex = loader.loadImgs()
+    xshape = trainX[0].shape
+    trainy = y[imgExisIndex]
+
+    # net = ProfileCNN(xshape,yclassNum=yclassNum,feaDim=512)
+    # net.fit(trainX,trainy)
     # net.savemodel()
-    #
-    # extracter = ProfileCNN()
-    # extracter.loadModel()
-    # feas = extracter.extracFeas(X[:3,:,:,:])
-    # print(feas.shape)
+
+    extractor = ProfileCNN(xshape=(64,64,3),yclassNum=yclassNum)
+    extractor.loadModel()
+    feas = extractor.extracFeas(trainX[:3,:,:,:]) # test the 1st three imgs
+    print(feas.shape)
+    # the output dimension of features is 512, you can decrease it by feaDim.
+    # But keep feaDim at least 4 times of yclassNum

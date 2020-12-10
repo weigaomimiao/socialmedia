@@ -21,6 +21,8 @@ from sklearn.feature_selection import SelectKBest, mutual_info_regression
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.preprocessing import StandardScaler
 import math
+
+from .ProfileImgNet import ProfileCNN,ImgLoader
 class Cleaner():
     '''
     Only for cleaning data x, y is handled in BuildDataset()
@@ -31,6 +33,10 @@ class Cleaner():
         self.method_ = method # indicate whether to take numerical features or cut to bins
         self.dropOutlierRatio_ = dropOutlierRatio
         self.discreteMethod_ = discreteMethod
+        self.train_size = 7500
+        self.test_size = 2500
+        self.imgSize = (64,64,3)
+        self.yBinsNum = 50
 
     def cleanData(self,df):
         self.df = df
@@ -81,8 +87,37 @@ class Cleaner():
         pass
 
     def extractImg(self):
-        # extract features from profile image
-        pass
+        # before extracting features, you can change epochs, yclassNum and feaDim in ProfileImgNet.py
+        # After that, you will get a model under /savedModel, which is named as 'cnn-pfImg.h5'
+
+        # extract features from profile images
+        # 1) take image names
+        imgNameList = self.df['profileImg'].values
+
+        # 2) load images, some don't exist
+        imgTrainLoader = ImgLoader(imgNameList[:self.train_size],tasktype='train')
+        imgTestLoader = ImgLoader(imgNameList[self.train_size:], tasktype='test')
+
+        imgTrain, trainImgExisInd = imgTrainLoader.loadImgs()
+        imgTest,testImgExisInd = imgTestLoader.loadImgs()
+
+        # 3) load model
+        ## Possible errors:
+        # * the model path set in ProfileImgNet.py, when you run it seperately ../ is required, when you run it here, maybe you don't need ../
+        # *
+        extractor = ProfileCNN(xshape=self.imgSize, yclassNum=self.yBinsNum) # need to be the same as what you pass while training model
+        extractor.loadModel()
+
+        train_part = imgTrain[trainImgExisInd]
+        fea_train_part = extractor.extracFeas(train_part)
+
+        test_part = imgTest[testImgExisInd]
+        fea_test_part = extractor.extracFeas(test_part)
+
+        # 4) the extracted features need to match the correponding data item
+        # 5) need to deal with those images that don't exist, may try to fill with mean of img features
+        fea_mean = ''
+        # 6) combine new features with filling features and set df
 
     def classifyColor(self):
         '''
@@ -275,7 +310,6 @@ class Cleaner():
             if self.discreteMethod_=='interval':
                 numerical[c] = pd.cut(numerical[c], binsDict[c])
             elif self.discreteMethod_=='frequency':
-                # tmp =  pd.qcut(numerical[c], binsDict[c],duplicates='drop')
                 numerical[c] = pd.qcut(numerical[c], binsDict[c],duplicates='drop')
         category = pd.get_dummies(numerical, dummy_na=True)
         self.df = pd.concat([self.df, category], axis=1, ignore_index=False)
