@@ -18,3 +18,6 @@ There is a CSV file of various collected features that has been provided, in add
 outlier (0.75), log(1.5+x), old fillavgClick, mlp
 * Dec. 6: 1.75
 new fillavgClick, xgboost (not fine tuned), dummy_one_hot, train and test together to be cleaned and normalized
+* Dec. 9: 
+1.792:interval cutting, interval_log=0.2
+1.795: frequency cutting, interval_log=0.05

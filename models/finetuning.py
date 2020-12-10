@@ -9,9 +9,10 @@
 @desc:
 '''
 from sklearn.model_selection import GridSearchCV
+from sklearn.metrics import mean_squared_log_error
 
 class FineTuning():
-    def __init__(self,model,cv=10,param_grid=None):
+    def __init__(self,model,cv=10,param_grid=None,scoring='neg_mean_squared_log_error'):
         if param_grid is None:
             if model.__class__.__name__=='XGBoost':
                 # param_grid = {'max_depth':[4,5,6,7,8],'learning_rate':[1e2,1e3],'n_estimators':[200,300,400,500]}
@@ -19,7 +20,7 @@ class FineTuning():
                               'n_estimators': [ 500]}
             elif model.__class__.__name__=='MLP':
                 param_grid = {'epoch': [50, 100, 150, 200], 'learning_rate': [1e2, 1e3]}
-        self.fitter = GridSearchCV(estimator=model,param_grid=param_grid,scoring='neg_mean_absolute_error',cv=cv)
+        self.fitter = GridSearchCV(estimator=model,param_grid=param_grid,scoring=scoring,cv=cv)
 
     def finetuning(self,X,y):
         '''

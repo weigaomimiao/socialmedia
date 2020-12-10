@@ -18,20 +18,19 @@ from sklearn.linear_model import Ridge
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.feature_selection import SelectKBest, mutual_info_regression
-from sklearn.preprocessing import OneHotEncoder
+from sklearn.tree import DecisionTreeRegressor
 from sklearn.preprocessing import StandardScaler
+import math
 class Cleaner():
     '''
     Only for cleaning data x, y is handled in BuildDataset()
     '''
-    def __init__(self):
+    def __init__(self,method='num',dropOutlierRatio=0.25,discreteMethod='interval'):
         self.df = None
-        self.pickIndStart = -1 # the start index of picking fields
-        # self.indexlist_ = ['id','uname','url','covImgStatus','verifStatus','textColor','pageColor','themeColor','isViewSizeCustom','utcOffset','location','isLocVisible','uLanguage','creatTimestamp','uTimeZone','numFollowers','numPeopleFollowing','numStatUpdate','numDMessage','category','avgvisitPerSecond','avgClick','profileImg','numPLikes']
-        # if pickfields is None:
-        #     self.pickFields_ = ['utcOffset', 'creatTimestamp_year','numDMessageLog','numStatUpdateLog','numFollowersLog','numPeopleFollowingLog','utcOffset', 'creatTimestamp_year','hasUrl','category','verifStatus','textClass','pageClass','themeClass','isLocVisible','uLanguage','isViewSizeCustom']
-        # else:
-        #     self.pickFields_ = pickfields
+        # self.pickIndStart = -1 # the start index of picking fields
+        self.method_ = method # indicate whether to take numerical features or cut to bins
+        self.dropOutlierRatio_ = dropOutlierRatio
+        self.discreteMethod_ = discreteMethod
 
     def cleanData(self,df):
         self.df = df
@@ -42,7 +41,9 @@ class Cleaner():
         # self.outlier_dealing()
         self.onehotencode() # encode discrete features
         self.rescaleData()  # take logarithmic of numerical features
-        self.cut2box() # cut continuous data
+        if self.method_=='box' and self.discreteMethod_!='DT':
+            # if need boxing features, do cutting
+            self.cut2box() # cut continuous data by pd.cut or pd.qcut
         return self.df
 
     def rescaleData(self):
@@ -119,15 +120,6 @@ class Cleaner():
         theme_vec = np.concatenate((dfthemer, dfthemeg, dfthemeb), axis=1)
         kmeans_theme = KMeans(n_clusters=5).fit(theme_vec)
 
-        # self.df['dftextr'] = dftextr
-        # self.df['dftextg'] = dftextg
-        # self.df['dftextb'] = dftextb
-        # self.df['dfpager'] = dfpager
-        # self.df['dfpageg'] = dfpageg
-        # self.df['dfpageb'] = dfpageb
-        # self.df['dfthemer'] = dfthemer
-        # self.df['dfthemeg'] = dfthemeg
-        # self.df['dfthemeb'] = dfthemeb
         self.df['textClass'] = [str(int(i)) for i in kmeans_text.labels_]
         self.df['pageClass'] = [str(int(i)) for i in kmeans_page.labels_]
         self.df['themeClass'] = [str(int(i)) for i in kmeans_theme.labels_]
@@ -187,8 +179,8 @@ class Cleaner():
         numeric_columns = self.df.loc[:,['numFollowers', 'numPeopleFollowing', 'numStatUpdate', 'numDMessage', 'avgClick']]
         for column in numeric_columns:
             set = self.df[column]
-            qu_high = set.quantile(q=0.75)
-            qu_low = set.quantile(q=0.25)
+            qu_high = set.quantile(q=1-self.dropOutlierRatio_) # say 0.75
+            qu_low = set.quantile(q=self.dropOutlierRatio_) # say 0.25
             value = qu_high - qu_low
             top = qu_high + 1.5 * value
             bottom = qu_low - 1.5 * value
@@ -256,25 +248,79 @@ class Cleaner():
         self.fillcategory()
         self.fillavgclick()
 
-
-
     def fillLoc(self):
         # filling?
         pass
 
     def cut2box(self):
         '''
-        Discretize numerical continuous data
+        Discretize numerical continuous data, use pd.cut or pd.qcut
         :return:
         '''
-        pass
+        interval_log = 0.05
+        def getNums(fieldName):
+            # set the interval of log values while cutting, then calculate the number of bins
+            a = math.ceil((self.df[fieldName].max()-self.df[fieldName].min())/interval_log)
+            return a
+        binsDict = {
+            'avgClickLog':getNums('avgClickLog'),
+            'numDMessageLog':getNums('numDMessageLog'),
+            'numStatUpdateLog': getNums('numStatUpdateLog'),
+            'numFollowersLog':getNums('numFollowersLog'),
+            'numPeopleFollowingLog':getNums('numPeopleFollowingLog')
+        }
+        cols = list(binsDict.keys())
+        numerical = self.df[cols].copy(deep=True)
+        for c in cols:
+            if self.discreteMethod_=='interval':
+                numerical[c] = pd.cut(numerical[c], binsDict[c])
+            elif self.discreteMethod_=='frequency':
+                # tmp =  pd.qcut(numerical[c], binsDict[c],duplicates='drop')
+                numerical[c] = pd.qcut(numerical[c], binsDict[c],duplicates='drop')
+        category = pd.get_dummies(numerical, dummy_na=True)
+        self.df = pd.concat([self.df, category], axis=1, ignore_index=False)
 
-    def getPickIndex(self):
-        '''
-        Return the begining index for picking fields, the picked df will be df.iloc[:][self.pickIndStart:]
-        :return:
-        '''
-        return self.pickIndStart
+    def boxing(self,train_y): # will be called if discreteMethod=='DT'
+        numerical = self.df.loc[:,
+                    ['avgClickLog', 'numDMessageLog', 'numStatUpdateLog',
+                     'numFollowersLog', 'numPeopleFollowingLog']]
+        for column in numerical:
+            boundary = []
+            box = DecisionTreeRegressor(min_samples_leaf=0.05)
+            x = np.array(numerical.loc[:, [column]])
+            y = np.array(train_y)
+            box.fit(x[:x.shape[0]], y)
+
+            n_nodes = box.tree_.node_count  # 决策树的节点数
+            children_left = box.tree_.children_left  # node_count大小的数组，children_left[i]表示第i个节点的左子节点
+            children_right = box.tree_.children_right  # node_count大小的数组，children_right[i]表示第i个节点的右子节点
+            threshold = box.tree_.threshold  # node_count大小的数组，threshold[i]表示第i个节点划分数据集的阈值
+
+            for i in range(n_nodes):
+                if children_left[i] != children_right[i]:  # 非叶节点
+                    boundary.append(threshold[i])
+
+            min_x = x.min()
+            max_x = x.max() + 1e-3
+            boundary.sort()
+            boundary = [min_x] + boundary + [max_x]
+            self.df[column] = pd.cut(x=self.df[column], bins=boundary, right=True, labels=range(0, len(boundary) - 1))
+        category = self.df.loc[:,
+                       ['avgClickLog', 'numDMessageLog', 'numStatUpdateLog',
+                        'numFollowersLog', 'numPeopleFollowingLog']]
+        category_df = pd.get_dummies(category, dummy_na=True)
+        self.df = pd.concat([self.df, category_df], axis=1, ignore_index=False)
+
+    def cleanDateBox(self,df,train_y):
+        self.df = df
+        del df
+        self.fillna()
+        self.outlier_dealing()
+        self.buildFeatures()
+        self.onehotencode()  # encode discrete features
+        self.rescaleData()  # take logarithmic of numerical features
+        self.boxing(train_y)
+        return self.df
 class Standardize():
     def __init__(self):
         self.standrdX = StandardScaler()
