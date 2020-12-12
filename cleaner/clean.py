@@ -21,6 +21,7 @@ from sklearn.feature_selection import SelectKBest, mutual_info_regression
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.preprocessing import StandardScaler
 import math
+import util
 
 from .ProfileImgNet import ProfileCNN,ImgLoader
 class Cleaner():
@@ -92,29 +93,34 @@ class Cleaner():
 
         # extract features from profile images
         # 1) take image names
-        imgNameList = self.df['profileImg'].values
+        # imgNameList = self.df['profileImg'].values
+        #
+        # # 2) load images, some don't exist
+        # imgTrainLoader = ImgLoader(imgNameList[:self.train_size],tasktype='train',path="%s/data/%s_profile_images/profile_images_%s")
+        # imgTestLoader = ImgLoader(imgNameList[self.train_size:], tasktype='test',path="%s/data/%s_profile_images/profile_images_%s")
+        #
+        # imgTrain,trainImgExisInd = imgTrainLoader.loadImgs()
+        # imgTest,testImgExisInd = imgTestLoader.loadImgs()
+        # print(np.invert(np.array(testImgExisInd)).sum())
+        #
+        # # 3) load model
+        # extractor = ProfileCNN(xshape=self.imgSize, yclassNum=self.yBinsNum,isRelativePath=False) # need to be the same as what you pass while training model
+        # extractor.loadModel()
+        #
+        # fea_train_part = extractor.extracFeas(imgTrain)
+        # del imgTrain
+        #
+        # fea_test_part = extractor.extracFeas(imgTest)
+        # del imgTest
 
-        # 2) load images, some don't exist
-        imgTrainLoader = ImgLoader(imgNameList[:self.train_size],tasktype='train',path="%s/data/%s_profile_images/profile_images_%s")
-        imgTestLoader = ImgLoader(imgNameList[self.train_size:], tasktype='test',path="%s/data/%s_profile_images/profile_images_%s")
+        fea_train = pd.read_csv('%s/data/train-img-feas.csv'%util.getBasePath(),index_col=0)
+        fea_test = pd.read_csv('%s/data/test-img-feas.csv' % util.getBasePath(),index_col=0)
 
-        imgTrain,trainImgExisInd = imgTrainLoader.loadImgs()
-        imgTest,testImgExisInd = imgTestLoader.loadImgs()
-        print(np.invert(np.array(testImgExisInd)).sum())
-
-        # 3) load model
-        extractor = ProfileCNN(xshape=self.imgSize, yclassNum=self.yBinsNum,isRelativePath=False) # need to be the same as what you pass while training model
-        extractor.loadModel()
-
-        fea_train_part = extractor.extracFeas(imgTrain)
-        del imgTrain
-
-        fea_test_part = extractor.extracFeas(imgTest)
-        del imgTest
-
-        df_imgs = pd.DataFrame(data=np.vstack((fea_train_part,fea_test_part)),columns=list(range(128)))
+        df_imgs = pd.concat([fea_train,fea_test],axis=0,ignore_index=True)
 
         self.df = pd.concat([self.df,df_imgs],axis=1)
+        del df_imgs
+        print('get images done')
 
     def classifyColor(self):
         '''

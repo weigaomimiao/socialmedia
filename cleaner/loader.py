@@ -15,7 +15,7 @@ from .clean import FeaSelector,Standardize,Cleaner
 
 class BuildDataset():
     def __init__(self,kbest=15,notPickfields=None,featuresEng='num+onehot',
-                 dropOutlierRatio=0.25,discreteMethod=None):
+                 dropOutlierRatio=0.25,discreteMethod=None,imgFeaDim=128):
         # check setting parameters
         if featuresEng not in ['num+onehot','box+onehot']:
             print('Please set featuresEng legally, only num+onehot and box+pnehot are available')
@@ -38,7 +38,7 @@ class BuildDataset():
         # the original log numerical features won't be picked
         self.notPickfieldsNum_ = ['avgClickLog', 'numDMessageLog', 'numStatUpdateLog','numFollowersLog', 'numPeopleFollowingLog']
         self.normFields = ['utcOffset_hour', 'creatTimestamp_year', 'avgClickLog', 'numDMessageLog', 'numStatUpdateLog',
-                           'numFollowersLog', 'numPeopleFollowingLog']
+                           'numFollowersLog', 'numPeopleFollowingLog']+[str(i) for i in range(imgFeaDim)]
         self.method_ = featuresEng.split('+')[0]
         self.discreteMethod_ = discreteMethod
         if self.method_=='box':
@@ -58,50 +58,6 @@ class BuildDataset():
 
         # processing data
         self.process()
-        # df_train = self.loadData('train')
-        # df_test = self.loadData('test')
-        # self.testId = df_test['id'].values
-        # # set y, expand dims for model
-        # trainY = df_train['numPLikes'].values
-        # trainLogY = [np.log10(1.5 + i) for i in trainY]
-        #
-        # # clean
-        # # df_trainX, df_testX = self.cleanData(df_train.iloc[:, :-1], df_test)
-        # # # standard x and select kbest x
-        # # self.trainX,self.testX = self.normalizeData(df_trainX,df_testX)
-        # # if (kbest > 0):
-        # #     self.trainX,self.testX = self.selectKBest(self.trainX,trainLogY,self.testX)
-        # # # set y, expand dims for model
-        # # self.trainLogY = np.expand_dims(trainLogY, axis=1)
-        # # self.trainY = np.expand_dims(trainY, axis=1)
-        # # del df_train,df_test,df_trainX,df_testX
-        #
-        # # clean
-        # df_trainX,df_testX = None,None
-        # if featuresEng == 'num+onehot':
-        #     df_trainX, df_testX = self.cleanData(df_train.iloc[:, :-1], df_test,method='num')
-        #
-        # elif featuresEng == 'box+onehot':
-        #     self.notPickfields_ += self.notPickfieldsNum_
-        #     df_trainX, df_testX = self.cleandateforboxing(df_train=df_train.iloc[:, :-1], df_test=df_test,
-        #                                                   train_y=trainLogY)
-        #     # # standard x and select kbest x
-        #     # self.trainX, self.testX = self.normalizeData(df_trainX, df_testX)
-        #     # if (kbest > 0):
-        #     #     self.trainX, self.testX = self.selectKBest(self.trainX, trainLogY, self.testX)
-        #     # # set y, expand dims for model
-        #     # self.trainLogY = np.expand_dims(trainLogY, axis=1)
-        #     # self.trainY = np.expand_dims(trainY, axis=1)
-        #     # del df_train, df_test, df_trainX, df_testX
-        #     # standard x and select kbest x
-        # # normalization and selecting features.
-        # self.trainX, self.testX = self.normalizeData(df_trainX, df_testX)
-        # if (kbest > 0):
-        #     self.trainX, self.testX = self.selectKBest(self.trainX, trainLogY, self.testX)
-        # # set y, expand dims for model
-        # self.trainLogY = np.expand_dims(trainLogY, axis=1)
-        # self.trainY = np.expand_dims(trainY, axis=1)
-        # del df_train, df_test, df_trainX, df_testX
 
     def process(self):
         df_train = self.loadData('train')

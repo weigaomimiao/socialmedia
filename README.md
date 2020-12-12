@@ -21,3 +21,4 @@ new fillavgClick, xgboost (not fine tuned), dummy_one_hot, train and test togeth
 * Dec. 9: 
 1.792:interval cutting, interval_log=0.2
 1.795: frequency cutting, interval_log=0.05
+* Dec.10-
