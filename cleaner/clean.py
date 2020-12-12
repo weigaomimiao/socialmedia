@@ -35,8 +35,8 @@ class Cleaner():
         self.discreteMethod_ = discreteMethod
         self.train_size = 7500
         self.test_size = 2500
-        self.imgSize = (64,64,3)
-        self.yBinsNum = 50
+        self.imgSize = (32,32,3)
+        self.yBinsNum = 10
 
     def cleanData(self,df):
         self.df = df
@@ -95,29 +95,26 @@ class Cleaner():
         imgNameList = self.df['profileImg'].values
 
         # 2) load images, some don't exist
-        imgTrainLoader = ImgLoader(imgNameList[:self.train_size],tasktype='train')
-        imgTestLoader = ImgLoader(imgNameList[self.train_size:], tasktype='test')
+        imgTrainLoader = ImgLoader(imgNameList[:self.train_size],tasktype='train',path="%s/data/%s_profile_images/profile_images_%s")
+        imgTestLoader = ImgLoader(imgNameList[self.train_size:], tasktype='test',path="%s/data/%s_profile_images/profile_images_%s")
 
-        imgTrain, trainImgExisInd = imgTrainLoader.loadImgs()
+        imgTrain,trainImgExisInd = imgTrainLoader.loadImgs()
         imgTest,testImgExisInd = imgTestLoader.loadImgs()
+        print(np.invert(np.array(testImgExisInd)).sum())
 
         # 3) load model
-        ## Possible errors:
-        # * the model path set in ProfileImgNet.py, when you run it seperately ../ is required, when you run it here, maybe you don't need ../
-        # *
-        extractor = ProfileCNN(xshape=self.imgSize, yclassNum=self.yBinsNum) # need to be the same as what you pass while training model
+        extractor = ProfileCNN(xshape=self.imgSize, yclassNum=self.yBinsNum,isRelativePath=False) # need to be the same as what you pass while training model
         extractor.loadModel()
 
-        train_part = imgTrain[trainImgExisInd]
-        fea_train_part = extractor.extracFeas(train_part)
+        fea_train_part = extractor.extracFeas(imgTrain)
+        del imgTrain
 
-        test_part = imgTest[testImgExisInd]
-        fea_test_part = extractor.extracFeas(test_part)
+        fea_test_part = extractor.extracFeas(imgTest)
+        del imgTest
 
-        # 4) the extracted features need to match the correponding data item
-        # 5) need to deal with those images that don't exist, may try to fill with mean of img features
-        fea_mean = ''
-        # 6) combine new features with filling features and set df
+        df_imgs = pd.DataFrame(data=np.vstack((fea_train_part,fea_test_part)),columns=list(range(128)))
+
+        self.df = pd.concat([self.df,df_imgs],axis=1)
 
     def classifyColor(self):
         '''

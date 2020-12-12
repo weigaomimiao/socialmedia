@@ -9,7 +9,6 @@
 @desc:
 '''
 from tensorflow.keras.applications.vgg16 import VGG16
-# from tensorflow.keras.preprocessing import image
 from tensorflow.keras.models import Model
 from tensorflow.keras.layers import Dense, GlobalAveragePooling2D
 from tensorflow.keras.optimizers import SGD
@@ -19,15 +18,16 @@ from util import getBasePath
 from keras import backend as K
 import tensorflow as tf
 import os
+import numpy as np
 
 class ImgLoader():
-    def __init__(self, imgNameList, tasktype='train'):
+    def __init__(self, imgNameList, tasktype='train',path="%s/../data/%s_profile_images/profile_images_%s"):
         self.imgNameList = imgNameList
         if tasktype not in ['train', 'test']:
             print("please set tasktype as train or test")
         self.tasktype = tasktype
         self.imgList = []
-        self.imgBasePath = "%s/../data/%s_profile_images/profile_images_%s" % (getBasePath(), self.tasktype, self.tasktype)
+        self.imgBasePath = path % (getBasePath(), self.tasktype, self.tasktype)
         self.imgExisIndex = []
 
     def loadImgs(self):
@@ -38,20 +38,24 @@ class ImgLoader():
                 continue
             else:
                 self.imgExisIndex.append(True)
-                img = image.load_img(apath, target_size=(64, 64),color_mode='rgb',interpolation='nearest')
+                img = image.load_img(apath, target_size=(32, 32),color_mode='rgb',interpolation='nearest')
                 img = np.array(image.img_to_array(img))
                 self.imgList.append(img)
 
-        return np.array(self.imgList )/ 255, self.imgExisIndex
+        return np.array(self.imgList)/ 255, self.imgExisIndex
 
 
 class ProfileCNN():
-    def __init__(self,xshape,yclassNum=10,epochs=1,feaDim=512):
+    def __init__(self,xshape,yclassNum=10,epochs=1,feaDim=128,isRelativePath=True):
         self.model = None
         self.xshape_ = xshape
         self.yclassNum_ = yclassNum
         self.epochs = epochs
         self.feaDim = feaDim
+        if isRelativePath: # Indicate whether to use  or %s/savedModel/cnn-pfImg.h5
+            self.modelpath = '%s/../savedModel/cnn-pfImg.h5'
+        else:
+            self.modelpath = '%s/savedModel/cnn-pfImg.h5'
         self.buildNet()
 
     def buildNet(self):
@@ -124,15 +128,11 @@ class ProfileCNN():
         return features
 
     def savemodel(self):
-        self.model.save('%s/../savedModel/cnn-pfImg.h5' % getBasePath())
+        self.model.save(self.modelpath % getBasePath())
 
     def loadModel(self):
-        return tf.keras.models.load_model('%s/../savedModel/cnn-pfImg.h5' % getBasePath())
-
-
-
-
-
+        bs = getBasePath()
+        return tf.keras.models.load_model(self.modelpath % getBasePath())
 
 
 if __name__ == '__main__':
@@ -151,19 +151,22 @@ if __name__ == '__main__':
     imgNamelist_train = df_train['profileImg'].values
     imgNamelist_test = df_test['profileImg'].values
 
-    yclassNum = 50
+    yclassNum = 10
     df_train['numPLikeslog'] = df_train['numPLikes'].map(lambda x: np.log10(1.5+x))
-    y = pd.get_dummies(pd.cut(df_train['numPLikeslog'], yclassNum)).values
+    y = pd.get_dummies(pd.qcut(df_train['numPLikeslog'], yclassNum,duplicates='drop')).values # note ycalssNum
+    # y = pd.get_dummies(pd.cut(df_train['numPLikeslog'], yclassNum)).values
     loader = ImgLoader(imgNameList=imgNamelist_train,tasktype='train')
     trainX,imgExisIndex = loader.loadImgs()
+    # print(np.array(imgExisIndex).sum())
     xshape = trainX[0].shape
     trainy = y[imgExisIndex]
+    trainy = y
 
-    # net = ProfileCNN(xshape,yclassNum=yclassNum,feaDim=512)
-    # net.fit(trainX,trainy)
-    # net.savemodel()
+    net = ProfileCNN(xshape,yclassNum=yclassNum,feaDim=128,isRelativePath=True)
+    net.fit(trainX,trainy)
+    net.savemodel()
 
-    extractor = ProfileCNN(xshape=(64,64,3),yclassNum=yclassNum)
+    extractor = ProfileCNN(xshape=(32,32,3),yclassNum=yclassNum,feaDim=128)
     extractor.loadModel()
     feas = extractor.extracFeas(trainX[:3,:,:,:]) # test the 1st three imgs
     print(feas.shape)
