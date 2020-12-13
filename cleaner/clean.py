@@ -22,8 +22,9 @@ from sklearn.tree import DecisionTreeRegressor
 from sklearn.preprocessing import StandardScaler
 import math
 import util
+from .siftProfileImg import SIFTExtractor
 
-from .ProfileImgNet import ProfileCNN,ImgLoader
+# from .ProfileImgNet import ProfileCNN,ImgLoader
 class Cleaner():
     '''
     Only for cleaning data x, y is handled in BuildDataset()
@@ -62,13 +63,14 @@ class Cleaner():
 
     def buildFeatures(self):
         self.classifyColor()
-        self.extractImg()
+        # self.extractImg()
+        # self.extractImgSift()
         self.extractLoc()
 
         self.df['hasUrl'] = self.df['url'].isnull()
         self.df['hasUrl'] = self.df['hasUrl'].map(str)
-        # feature starting ID, do put the line below after hasUrl
-        self.pickIndStart = self.df.shape[1]
+        # # feature starting ID, do put the line below after hasUrl
+        # self.pickIndStart = self.df.shape[1]
 
         self.df['utcOffset_hour'] = self.df['utcOffset'] / 3600
         create_year = self.df['creatTimestamp'].apply(lambda x: x.split()[-1]).tolist()
@@ -77,10 +79,11 @@ class Cleaner():
 
     def onehotencode(self):
         self.df['isLocVisible'] = self.df['isLocVisible'].str.lower()
-        self.df['covImgStatus'].fillna('Set', inplace=True)
+        self.df['isViewSizeCustom'] = self.df['isViewSizeCustom'].map(str)
+        self.df['covImgStatus'].fillna('Unknown', inplace=True)
         category = self.df.loc[:,
                    ['hasUrl', 'covImgStatus', 'verifStatus', 'isViewSizeCustom', 'isLocVisible', 'uLanguage','textClass','pageClass','themeClass']]
-        category_df = pd.get_dummies(category, dummy_na=True)
+        category_df = pd.get_dummies(category, dummy_na=False)
         self.df = pd.concat([self.df,category_df],axis=1,ignore_index=False)
 
     def extractLoc(self):
@@ -88,31 +91,6 @@ class Cleaner():
         pass
 
     def extractImg(self):
-        # before extracting features, you can change epochs, yclassNum and feaDim in ProfileImgNet.py
-        # After that, you will get a model under /savedModel, which is named as 'cnn-pfImg.h5'
-
-        # extract features from profile images
-        # 1) take image names
-        # imgNameList = self.df['profileImg'].values
-        #
-        # # 2) load images, some don't exist
-        # imgTrainLoader = ImgLoader(imgNameList[:self.train_size],tasktype='train',path="%s/data/%s_profile_images/profile_images_%s")
-        # imgTestLoader = ImgLoader(imgNameList[self.train_size:], tasktype='test',path="%s/data/%s_profile_images/profile_images_%s")
-        #
-        # imgTrain,trainImgExisInd = imgTrainLoader.loadImgs()
-        # imgTest,testImgExisInd = imgTestLoader.loadImgs()
-        # print(np.invert(np.array(testImgExisInd)).sum())
-        #
-        # # 3) load model
-        # extractor = ProfileCNN(xshape=self.imgSize, yclassNum=self.yBinsNum,isRelativePath=False) # need to be the same as what you pass while training model
-        # extractor.loadModel()
-        #
-        # fea_train_part = extractor.extracFeas(imgTrain)
-        # del imgTrain
-        #
-        # fea_test_part = extractor.extracFeas(imgTest)
-        # del imgTest
-
         fea_train = pd.read_csv('%s/data/train-img-feas.csv'%util.getBasePath(),index_col=0)
         fea_test = pd.read_csv('%s/data/test-img-feas.csv' % util.getBasePath(),index_col=0)
 
@@ -121,6 +99,25 @@ class Cleaner():
         self.df = pd.concat([self.df,df_imgs],axis=1)
         del df_imgs
         print('get images done')
+
+    def extractImgSift(self):
+        imgNamelist_train = self.df['profileImg'].values[:self.train_size]
+        imgNamelist_test = self.df['profileImg'].values[self.train_size:]
+
+        n_clusters = 10
+        extractor = SIFTExtractor(n_clusters=n_clusters)
+        extractor.fit(imgNamelist_train)
+        img_label_train = extractor.classifyImgs('train', imgNamelist_train).tolist()
+        img_label_test = extractor.classifyImgs('test', imgNamelist_test).tolist()
+
+        img_labels = img_label_train+img_label_test
+        img_labels = [str(i) for i in img_labels]
+
+        img_labels_df = pd.DataFrame({'sift_labels':img_labels})
+        category = pd.get_dummies(img_labels_df, dummy_na=False)
+        self.df = pd.concat([self.df,category],axis=1)
+        print('sift done')
+
 
     def classifyColor(self):
         '''
@@ -222,9 +219,9 @@ class Cleaner():
             value = qu_high - qu_low
             top = qu_high + 1.5 * value
             bottom = qu_low - 1.5 * value
-            set.where(cond=(set < top), other=top, inplace=True)
+            set.where(cond=(set < top), other=top, inplace=True) # replace outlier
             set.where(cond=(set > bottom), other=bottom, inplace=True)
-            self.df[column] = set
+            self.df[column] = set.values
 
     def fillavgclick(self):
         # feature using: verifStatus,hasurl,category
@@ -314,7 +311,7 @@ class Cleaner():
                 numerical[c] = pd.cut(numerical[c], binsDict[c])
             elif self.discreteMethod_=='frequency':
                 numerical[c] = pd.qcut(numerical[c], binsDict[c],duplicates='drop')
-        category = pd.get_dummies(numerical, dummy_na=True)
+        category = pd.get_dummies(numerical, dummy_na=False)
         self.df = pd.concat([self.df, category], axis=1, ignore_index=False)
 
     def boxing(self,train_y): # will be called if discreteMethod=='DT'
@@ -345,7 +342,7 @@ class Cleaner():
         category = self.df.loc[:,
                        ['avgClickLog', 'numDMessageLog', 'numStatUpdateLog',
                         'numFollowersLog', 'numPeopleFollowingLog']]
-        category_df = pd.get_dummies(category, dummy_na=True)
+        category_df = pd.get_dummies(category, dummy_na=False)
         self.df = pd.concat([self.df, category_df], axis=1, ignore_index=False)
 
     def cleanDateBox(self,df,train_y):

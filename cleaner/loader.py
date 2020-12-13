@@ -32,7 +32,9 @@ class BuildDataset():
             self.notPickfields_ = ['id', 'uname', 'url', 'covImgStatus', 'verifStatus', 'textColor', 'pageColor', 'themeColor',
                       'isViewSizeCustom', 'utcOffset', 'location', 'isLocVisible', 'uLanguage', 'creatTimestamp',
                       'uTimeZone', 'numFollowers', 'numPeopleFollowing', 'numStatUpdate', 'numDMessage',
-                      'category', 'avgvisitPerSecond', 'avgClick', 'profileImg', 'numPLikes','hasUrl'] # features that won't be picked
+                      'category', 'avgvisitPerSecond', 'avgClick', 'profileImg', 'numPLikes','hasUrl','textClass','pageClass','themeClass'] # features that won't be picked
+
+
         else:
             self.notPickfields_ = notPickfields
         # the original log numerical features won't be picked
@@ -66,6 +68,7 @@ class BuildDataset():
         # set y, expand dims for model
         trainY = df_train['numPLikes'].values
         trainLogY = [np.log10(1.5 + i) for i in trainY]
+        trainLogY = self.dealyOutlier(trainLogY)
 
         df_trainX, df_testX = None,None
         if self.method_=='box': # directly take picked df as features, no need for normalization
@@ -122,10 +125,12 @@ class BuildDataset():
 
         df_new = self.cleaner.cleanData(df)
 
+        df_new.to_csv('%s/data/X_all.csv'%getBasePath())
         # pick fields that are not in notPickfields_
         columns = df_new.columns.values
         column_picked = set(columns).difference(set(self.notPickfields_))
         df_picked = df_new[column_picked]
+        df_picked.to_csv('%s/data/X_picked.csv' % getBasePath())
 
         x_train = df_picked.iloc[:train_size,:]
         x_test = df_picked.iloc[train_size:, :]
@@ -145,6 +150,8 @@ class BuildDataset():
         trainX = np.concatenate((trainX_part,df_trainX[column_class].values),axis=1)
         testX = np.concatenate((testX_part, df_testX[column_class].values), axis=1)
 
+        df_tmp = pd.DataFrame(data=np.concatenate((trainX,testX),axis=0),columns=(list(range(trainX.shape[1]))))
+        df_tmp.to_csv('%s/data/X_normed.csv'%getBasePath())
         return trainX,testX
 
     def selectKBest(self,trainX,trainLogY,testX):
@@ -168,3 +175,14 @@ class BuildDataset():
         x_train = df_picked.iloc[:train_size, :]
         x_test = df_picked.iloc[train_size:, :]
         return x_train, x_test
+
+    def dealyOutlier(self,y):
+        df_y = pd.DataFrame({'y':y})
+        qu_high = df_y['y'].quantile(q=1 - self.dropOutlierRatio_/2)  # say 0.75
+        qu_low = df_y['y'].quantile(q=self.dropOutlierRatio_/2)  # say 0.25
+        value = qu_high - qu_low
+        top = qu_high + 1.5 * value
+        bottom = qu_low - 1.5 * value
+        df_y['y'].where(cond=(df_y['y'] < top), other=top, inplace=True)
+        df_y['y'].where(cond=(df_y['y'] > bottom), other=bottom, inplace=True)
+        return df_y['y'].values

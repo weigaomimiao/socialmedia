@@ -12,10 +12,14 @@ import cv2
 from util import getBasePath,manyImgs,collectImgs
 from sklearn.cluster import KMeans
 import os
+import numpy as np
 class SIFTExtractor():
-    def __init__(self, n_clusters=10):
+    def __init__(self, n_clusters=10,isRelativePath=True):
         self.sift_extractor = cv2.xfeatures2d_SIFT.create()
-        self.path = getBasePath() + '/../data/%s_profile_images/profile_images_%s/%s'
+        if not isRelativePath:
+            self.path = getBasePath() + '/../data/profile_images_%s/%s'
+        else:
+            self.path = getBasePath() + '/data/profile_images_%s/%s'
         self.n_clusters = n_clusters
         self.kmeans = KMeans(n_clusters=self.n_clusters, random_state=3724)
         self.nullImgInds = [] # keep tracking those with not existed profile images, int
@@ -26,7 +30,7 @@ class SIFTExtractor():
         print("Those profile images that are not existed:")
         print(10*"-")
         for imgName in imgNameList:
-            imgName = self.path % (dataset, dataset,imgName)
+            imgName = self.path % (dataset, imgName)
 
             img = np.zeros((32,32,3),np.uint8)
 
@@ -41,15 +45,16 @@ class SIFTExtractor():
             kp, des = self.sift_extractor.detectAndCompute(gray_img, None)
             if des is None:
                 des = np.zeros((1,128))
-            reshape_feature = des.reshape(-1, 1)
-            features.append(reshape_feature.tolist())
+            reshape_feature = des.mean(axis=0).reshape((1,128))
+            features.append(reshape_feature)
         print(numNullCount)
         print(10 * "-")
+        features = np.squeeze(np.array(features),axis=1)
         return features
 
     def fit(self, imgNameList):
         features = self.extractFeas(imgNameList, 'train')
-        input_x = np.array(features)
+        input_x = features
         self.kmeans.fit(input_x)
 
     def classifyImgs(self, dataset, imgNameList):
@@ -90,7 +95,7 @@ if __name__ == '__main__':
     imgNamelist_test = df_test['profileImg'].values
 
     n_clusters = 10
-    extractor = SIFTExtractor(n_clusters=10)
+    extractor = SIFTExtractor(n_clusters=10,isRelativePath=False)
     extractor.fit(imgNamelist_train)
     img_label_train = extractor.classifyImgs('train', imgNamelist_train)
 
