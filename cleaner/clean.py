@@ -40,14 +40,14 @@ class Cleaner():
         self.imgSize = (32,32,3)
         self.yBinsNum = 10
 
-    def cleanData(self,df):
+    def cleanData(self,df,trainLogY):
         self.df = df
         del df
         self.fillna()
-        self.outlier_dealing()
+        self.outlier_dealing() # ？？
         self.buildFeatures()
         # self.outlier_dealing()
-        self.onehotencode() # encode discrete features
+        self.onehotencode(trainLogY) # encode discrete features
         self.rescaleData()  # take logarithmic of numerical features
         if self.method_=='box' and self.discreteMethod_!='DT':
             # if need boxing features, do cutting
@@ -77,13 +77,26 @@ class Cleaner():
         create_year = [int(i) for i in create_year]
         self.df["creatTimestamp_year"] = create_year
 
-    def onehotencode(self):
+    def onehotencode(self,trainLogY):
         self.df['isLocVisible'] = self.df['isLocVisible'].str.lower()
         self.df['isViewSizeCustom'] = self.df['isViewSizeCustom'].map(str)
-        self.df['covImgStatus'].fillna('Unknown', inplace=True)
+        self.df['covImgStatus'].fillna('Set', inplace=True)
         category = self.df.loc[:,
-                   ['hasUrl', 'covImgStatus', 'verifStatus', 'isViewSizeCustom', 'isLocVisible', 'uLanguage','textClass','pageClass','themeClass']]
+                   ['hasUrl', 'covImgStatus', 'verifStatus', 'isViewSizeCustom', 'isLocVisible', 'textClass','pageClass','themeClass']]
+
+        xxu_train = self.df['uLanguage'][:self.train_size]
+        xxu_test = self.df['uLanguage'][self.train_size:]
+        from category_encoders import TargetEncoder
+        # xy = self.df['numPLikes'][:self.train_size]
+        # xy = np.log10(1.5 + xy)
+        xy = trainLogY
+        encoder_lang = TargetEncoder(cols=['uLanguage']).fit(xxu_train, xy)
+        train_lang = encoder_lang.transform(xxu_train)
+        test_lang = encoder_lang.transform(xxu_test)
+        self.df['uLanguage'] = pd.concat([train_lang,test_lang],axis=0)['uLanguage'].values
+
         category_df = pd.get_dummies(category, dummy_na=False)
+
         self.df = pd.concat([self.df,category_df],axis=1,ignore_index=False)
 
     def extractLoc(self):

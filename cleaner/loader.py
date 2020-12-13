@@ -30,7 +30,7 @@ class BuildDataset():
             self.dropOutlierRatio_ = dropOutlierRatio
         if notPickfields is None:
             self.notPickfields_ = ['id', 'uname', 'url', 'covImgStatus', 'verifStatus', 'textColor', 'pageColor', 'themeColor',
-                      'isViewSizeCustom', 'utcOffset', 'location', 'isLocVisible', 'uLanguage', 'creatTimestamp',
+                      'isViewSizeCustom', 'utcOffset', 'location', 'isLocVisible','creatTimestamp',
                       'uTimeZone', 'numFollowers', 'numPeopleFollowing', 'numStatUpdate', 'numDMessage',
                       'category', 'avgvisitPerSecond', 'avgClick', 'profileImg', 'numPLikes','hasUrl','textClass','pageClass','themeClass'] # features that won't be picked
 
@@ -68,7 +68,7 @@ class BuildDataset():
         # set y, expand dims for model
         trainY = df_train['numPLikes'].values
         trainLogY = [np.log10(1.5 + i) for i in trainY]
-        trainLogY = self.dealyOutlier(trainLogY)
+        # trainLogY = self.dealyOutlier(trainLogY)
 
         df_trainX, df_testX = None,None
         if self.method_=='box': # directly take picked df as features, no need for normalization
@@ -76,10 +76,10 @@ class BuildDataset():
                 df_trainX, df_testX = self.cleandateforboxing(
                     df_train=df_train.iloc[:, :-1], df_test=df_test,train_y=trainLogY)
             else:
-                df_trainX, df_testX = self.cleanData(df_train.iloc[:, :-1], df_test)
+                df_trainX, df_testX = self.cleanData(df_train.iloc[:, :-1], df_test,trainLogY)
             self.trainX, self.testX = df_trainX.values, df_testX.values
         else: # normalizing data only when one take numerical features.
-            df_trainX, df_testX = self.cleanData(df_train.iloc[:, :-1], df_test)
+            df_trainX, df_testX = self.cleanData(df_train.iloc[:, :-1], df_test,trainLogY)
 
         self.trainX, self.testX = self.normalizeData(df_trainX, df_testX)
 
@@ -113,7 +113,7 @@ class BuildDataset():
             df.columns = indexlist_
         return df
 
-    def cleanData(self,df_train,df_test):
+    def cleanData(self,df_train,df_test,trainLogY):
         '''
         Clean train and test together rather than one by one
         :param df_train:
@@ -123,7 +123,7 @@ class BuildDataset():
         train_size = df_train.shape[0]
         df = pd.concat([df_train,df_test],ignore_index=True)
 
-        df_new = self.cleaner.cleanData(df)
+        df_new = self.cleaner.cleanData(df,trainLogY)
 
         df_new.to_csv('%s/data/X_all.csv'%getBasePath())
         # pick fields that are not in notPickfields_

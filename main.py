@@ -223,10 +223,10 @@ if __name__ == "__main__":
     # trainvalLossPlot(train_scores,test_scores,model_name)
 
     #----------------------stacking
-    model = stacking(X,Ylog)
+    # model = stacking(X,Ylog)
 
     #----------------------predict
-    # model.fit(X,Ylog)
+    model.fit(X,Ylog)
     predict(testId,testX,model,stander)
 
 

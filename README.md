@@ -21,4 +21,7 @@ new fillavgClick, xgboost (not fine tuned), dummy_one_hot, train and test togeth
 * Dec. 9: 
 1.792:interval cutting, interval_log=0.2
 1.795: frequency cutting, interval_log=0.05
-* Dec.10-
+* Dec.12
+1. 1.7558：ulanguage target encoding, xgboost
+2. 1.7627: no outlier, ulanguage target encoding, xgboost
+3.       : utcoffset target
