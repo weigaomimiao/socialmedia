@@ -30,17 +30,19 @@ class BuildDataset():
             self.dropOutlierRatio_ = dropOutlierRatio
         if notPickfields is None:
             self.notPickfields_ = ['id', 'uname', 'url', 'covImgStatus', 'verifStatus', 'textColor', 'pageColor', 'themeColor',
-                      'isViewSizeCustom', 'utcOffset', 'location', 'isLocVisible','creatTimestamp',
+                      'isViewSizeCustom',  'location', 'isLocVisible','creatTimestamp','utcOffset_hour','account_last','creatTimestamp_month',
                       'uTimeZone', 'numFollowers', 'numPeopleFollowing', 'numStatUpdate', 'numDMessage',
-                      'category', 'avgvisitPerSecond', 'avgClick', 'profileImg', 'numPLikes','hasUrl','textClass','pageClass','themeClass'] # features that won't be picked
+                      'avgvisitPerSecond','avgvisitPerSecondLog', 'avgClick', 'profileImg',
+                       'numPLikes','hasUrl','textClass','pageClass','themeClass'] # features that won't be picked
 
-
+        # 'utcOffset','creatTimestamp_year','creatTimestamp_month','avgClickLog','numFollowersLog','numStatUpdateLog'
         else:
             self.notPickfields_ = notPickfields
         # the original log numerical features won't be picked
         self.notPickfieldsNum_ = ['avgClickLog', 'numDMessageLog', 'numStatUpdateLog','numFollowersLog', 'numPeopleFollowingLog']
-        self.normFields = ['utcOffset_hour', 'creatTimestamp_year', 'avgClickLog', 'numDMessageLog', 'numStatUpdateLog',
-                           'numFollowersLog', 'numPeopleFollowingLog']+[str(i) for i in range(imgFeaDim)]
+        #  'creatTimestamp_days',
+        self.normFields = ['mes+visit','utcOffset','creatTimestamp_year','numStatUpdateLog','avgClickLog',
+                           'numFollowersLog','numDMessageLog','numPeopleFollowingLog']+[str(i) for i in range(imgFeaDim)]
         self.method_ = featuresEng.split('+')[0]
         self.discreteMethod_ = discreteMethod
         if self.method_=='box':
@@ -82,6 +84,7 @@ class BuildDataset():
             df_trainX, df_testX = self.cleanData(df_train.iloc[:, :-1], df_test,trainLogY)
 
         self.trainX, self.testX = self.normalizeData(df_trainX, df_testX)
+        # self.trainX, self.testX = df_trainX.values,df_testX.values
 
         # selecting features.
         if (self.kbest > 0):
@@ -130,7 +133,7 @@ class BuildDataset():
         columns = df_new.columns.values
         column_picked = set(columns).difference(set(self.notPickfields_))
         df_picked = df_new[column_picked]
-        df_picked.to_csv('%s/data/X_picked.csv' % getBasePath())
+        # df_picked.to_csv('%s/data/X_picked.csv' % getBasePath())
 
         x_train = df_picked.iloc[:train_size,:]
         x_test = df_picked.iloc[train_size:, :]
@@ -150,8 +153,6 @@ class BuildDataset():
         trainX = np.concatenate((trainX_part,df_trainX[column_class].values),axis=1)
         testX = np.concatenate((testX_part, df_testX[column_class].values), axis=1)
 
-        df_tmp = pd.DataFrame(data=np.concatenate((trainX,testX),axis=0),columns=(list(range(trainX.shape[1]))))
-        df_tmp.to_csv('%s/data/X_normed.csv'%getBasePath())
         return trainX,testX
 
     def selectKBest(self,trainX,trainLogY,testX):

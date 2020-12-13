@@ -142,5 +142,5 @@ def trainvalLossPlot(trainloss,valloss,modelname):
     plt.plot(range(1,n+1),trainloss,color='blue',label='train')
     plt.plot(range(1, n + 1), valloss, color='orange',label='val')
     plt.title(modelname)
-    plt.legend()
+    # plt.legend()
     plt.show()

@@ -49,6 +49,7 @@ class Cleaner():
         # self.outlier_dealing()
         self.onehotencode(trainLogY) # encode discrete features
         self.rescaleData()  # take logarithmic of numerical features
+        self.crossFeas()
         if self.method_=='box' and self.discreteMethod_!='DT':
             # if need boxing features, do cutting
             self.cut2box() # cut continuous data by pd.cut or pd.qcut
@@ -60,6 +61,7 @@ class Cleaner():
         self.df['numStatUpdateLog'] = self.df['numStatUpdate'].map(lambda x: np.log10(1.5+x))
         self.df['numDMessageLog'] = self.df['numDMessage'].map(lambda x: np.log10(1.5+x))
         self.df['avgClickLog'] = self.df['avgClick'].map(lambda x: np.log10(1.5+x))
+        self.df['avgvisitPerSecondLog'] = self.df['avgvisitPerSecond'].map(lambda x: np.log10(1.5+x))
 
     def buildFeatures(self):
         self.classifyColor()
@@ -73,9 +75,22 @@ class Cleaner():
         # self.pickIndStart = self.df.shape[1]
 
         self.df['utcOffset_hour'] = self.df['utcOffset'] / 3600
-        create_year = self.df['creatTimestamp'].apply(lambda x: x.split()[-1]).tolist()
-        create_year = [int(i) for i in create_year]
-        self.df["creatTimestamp_year"] = create_year
+        # create_year = self.df['creatTimestamp'].apply(lambda x: x.split()[-1]).tolist()
+        # create_year = [int(i) for i in create_year]
+        # self.df["creatTimestamp_year"] = create_year
+
+        # create_timestamp_days
+        self.df['creatTimestamp'] = pd.to_datetime(self.df['creatTimestamp'])
+        self.df['creatTimestamp_year'] = 2020-(self.df['creatTimestamp'].dt.year).values
+        self.df['creatTimestamp_month'] = 12-(self.df['creatTimestamp'].dt.month).values
+        self.df['account_last'] = self.df['creatTimestamp_year']*12 + self.df['creatTimestamp_month']
+        # self.df['creatTimestamp_days'] = (self.df['creatTimestamp'].dt.day).values
+
+    def crossFeas(self):
+        # 'avgClickLog', 'numDMessageLog', 'numStatUpdateLog',
+        # 'numFollowersLog', 'numPeopleFollowingLog','avgvisitPerSecondLog'
+        # mes+visit from 1.75 to 1.74
+        self.df['mes+visit'] = self.df['numDMessageLog'] + self.df['avgvisitPerSecondLog']
 
     def onehotencode(self,trainLogY):
         self.df['isLocVisible'] = self.df['isLocVisible'].str.lower()
@@ -87,8 +102,6 @@ class Cleaner():
         xxu_train = self.df['uLanguage'][:self.train_size]
         xxu_test = self.df['uLanguage'][self.train_size:]
         from category_encoders import TargetEncoder
-        # xy = self.df['numPLikes'][:self.train_size]
-        # xy = np.log10(1.5 + xy)
         xy = trainLogY
         encoder_lang = TargetEncoder(cols=['uLanguage']).fit(xxu_train, xy)
         train_lang = encoder_lang.transform(xxu_train)
@@ -97,6 +110,16 @@ class Cleaner():
 
         category_df = pd.get_dummies(category, dummy_na=False)
 
+        self.df = pd.concat([self.df,category_df],axis=1,ignore_index=False)
+
+        xxu_train = self.df['category'][:self.train_size]
+        xxu_test = self.df['category'][self.train_size:]
+        encoder_lang = TargetEncoder(cols=['category']).fit(xxu_train, xy)
+        train_lang = encoder_lang.transform(xxu_train)
+        test_lang = encoder_lang.transform(xxu_test)
+        self.df['category'] = pd.concat([train_lang, test_lang], axis=0)['category'].values
+
+        category_df = pd.get_dummies(category, dummy_na=False)
         self.df = pd.concat([self.df,category_df],axis=1,ignore_index=False)
 
     def extractLoc(self):
@@ -366,6 +389,7 @@ class Cleaner():
         self.buildFeatures()
         self.onehotencode()  # encode discrete features
         self.rescaleData()  # take logarithmic of numerical features
+        self.crossFeas()
         self.boxing(train_y)
         return self.df
 class Standardize():

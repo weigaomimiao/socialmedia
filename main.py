@@ -201,14 +201,14 @@ if __name__ == "__main__":
 
     # fit savedModel with part data and evaluation
     # model = XGBoost()
-    model = XGBRegressor(n_jobs=-1,n_estimators=500,learning_rate=0.05,min_child_weight=5,max_depth=6,random_state=0)
+    model = XGBRegressor(n_jobs=-1,n_estimators=500,learning_rate=0.05,min_child_weight=5,max_depth=8,random_state=0)
     # train_sizes, train_scores, test_scores, fit_times, _ = \
-    #     learning_curve(model, X, Ylog, cv=15, n_jobs=-1,
-    #                    train_sizes=[0.7, 0.8, 0.9, 1],
-    #                    return_times=True, shuffle=True, scoring='neg_mean_squared_error')
-    # print('mean_train_scores, train with [70%,80%,90%,100%]', train_scores.mean(axis=1))
-    # print('mean_test_scores, train with [70%,80%,90%,100%]', test_scores.mean(axis=1))
-
+    #     learning_curve(model, X, Ylog, cv=10, n_jobs=-1,
+    #                    return_times=True, shuffle=True,
+    #                    scoring='neg_mean_squared_error')
+    # print('mean_train_scores, train with 100%,cv=10', train_scores.mean(axis=1))
+    # print('mean_test_scores, train with 100%,cv=10', test_scores.mean(axis=1))
+    # trainvalLossPlot(train_scores.tolist(),test_scores,'xgboost')
 
     #----------------- grid search
     # param_grid = {'max_depth': [4, 5, 6, 7, 8], 'learning_rate': [5e-2, 1e-3], 'n_estimators': [200, 300, 400, 500]}
